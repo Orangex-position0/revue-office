@@ -104,7 +104,7 @@ pub(crate) async fn run_migrations_sqlite(pool: &sqlx::SqlitePool) -> Result<()>
     Ok(())
 }
 
-async fn run_migrations_mysql(pool: &sqlx::MySqlPool) -> Result<()> {
+pub(crate) async fn run_migrations_mysql(pool: &sqlx::MySqlPool) -> Result<()> {
     sqlx::query(
         "CREATE TABLE IF NOT EXISTS _revue_migrations (\
             version BIGINT PRIMARY KEY, \

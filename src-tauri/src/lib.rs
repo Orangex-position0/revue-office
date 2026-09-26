@@ -33,12 +33,8 @@ async fn start_axum_server() -> anyhow::Result<()> {
     cfg.ensure_dirs()?;
 
     let pool = state::init_db_pool().await;
-    let session_service = app::bootstrap::build_session_service(
-        &cfg.database_url,
-        cfg.db_max_connections,
-        pool.clone(),
-    )
-    .await?;
+    let session_service =
+        app::bootstrap::build_session_service(&cfg.database_url, cfg.db_max_connections).await?;
     state::set_db_pool(pool);
     app::state::set_session_service(session_service)?;
 
