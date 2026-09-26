@@ -50,7 +50,7 @@ pub async fn init_pool(database_url: &str, data_dir: &str, max_connections: u32)
     }
 }
 
-async fn run_migrations_sqlite(pool: &sqlx::SqlitePool) -> Result<()> {
+pub(crate) async fn run_migrations_sqlite(pool: &sqlx::SqlitePool) -> Result<()> {
     sqlx::query(
         "CREATE TABLE IF NOT EXISTS _revue_migrations (\
             version INTEGER PRIMARY KEY, \

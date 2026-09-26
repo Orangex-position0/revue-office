@@ -24,6 +24,13 @@ pub trait SessionRepository: Send + Sync {
 
     async fn find_by_id(&self, id: &str) -> Result<Option<Conversation>, SessionRepositoryError>;
 
+    async fn list_by_owner(
+        &self,
+        owner_id: &str,
+        limit: u32,
+        query: Option<&str>,
+    ) -> Result<Vec<Conversation>, SessionRepositoryError>;
+
     async fn append_message(
         &self,
         session_id: &str,
@@ -40,6 +47,45 @@ pub trait SessionRepository: Send + Sync {
         &self,
         session_id: &str,
     ) -> Result<Vec<ConversationArtifact>, SessionRepositoryError>;
+
+    async fn replace_legacy_artifacts(
+        &self,
+        session_id: &str,
+        artifacts: Vec<ConversationArtifact>,
+    ) -> Result<(), SessionRepositoryError>;
+
+    async fn update_title(
+        &self,
+        session_id: &str,
+        owner_id: &str,
+        title: &str,
+    ) -> Result<bool, SessionRepositoryError>;
+
+    async fn update_placement(
+        &self,
+        session_id: &str,
+        owner_id: &str,
+        project_id: Option<&str>,
+        order: i64,
+    ) -> Result<bool, SessionRepositoryError>;
+
+    async fn update_summary(
+        &self,
+        session_id: &str,
+        summary: &str,
+    ) -> Result<(), SessionRepositoryError>;
+
+    async fn delete(
+        &self,
+        session_id: &str,
+        owner_id: &str,
+    ) -> Result<bool, SessionRepositoryError>;
+
+    async fn clear_messages(
+        &self,
+        session_id: &str,
+        owner_id: &str,
+    ) -> Result<bool, SessionRepositoryError>;
 }
 
 #[cfg(test)]
@@ -116,6 +162,33 @@ mod tests {
             Ok(self.conversations.lock().unwrap().get(id).cloned())
         }
 
+        async fn list_by_owner(
+            &self,
+            owner_id: &str,
+            limit: u32,
+            query: Option<&str>,
+        ) -> Result<Vec<Conversation>, SessionRepositoryError> {
+            let query = query.map(str::to_lowercase);
+            Ok(self
+                .conversations
+                .lock()
+                .unwrap()
+                .values()
+                .filter(|conversation| conversation.owner_id == owner_id)
+                .filter(|conversation| {
+                    query.as_ref().is_none_or(|query| {
+                        conversation.title.to_lowercase().contains(query)
+                            || conversation
+                                .summary
+                                .as_ref()
+                                .is_some_and(|summary| summary.to_lowercase().contains(query))
+                    })
+                })
+                .take(limit as usize)
+                .cloned()
+                .collect())
+        }
+
         async fn append_message(
             &self,
             session_id: &str,
@@ -156,6 +229,99 @@ mod tests {
                 .cloned()
                 .unwrap_or_default())
         }
+
+        async fn replace_legacy_artifacts(
+            &self,
+            session_id: &str,
+            artifacts: Vec<ConversationArtifact>,
+        ) -> Result<(), SessionRepositoryError> {
+            self.artifacts
+                .lock()
+                .unwrap()
+                .insert(session_id.into(), artifacts);
+            Ok(())
+        }
+
+        async fn update_title(
+            &self,
+            session_id: &str,
+            owner_id: &str,
+            title: &str,
+        ) -> Result<bool, SessionRepositoryError> {
+            let mut conversations = self.conversations.lock().unwrap();
+            let Some(conversation) = conversations.get_mut(session_id) else {
+                return Ok(false);
+            };
+            if conversation.owner_id != owner_id {
+                return Ok(false);
+            }
+            conversation.title = title.into();
+            Ok(true)
+        }
+
+        async fn update_placement(
+            &self,
+            session_id: &str,
+            owner_id: &str,
+            project_id: Option<&str>,
+            order: i64,
+        ) -> Result<bool, SessionRepositoryError> {
+            let mut conversations = self.conversations.lock().unwrap();
+            let Some(conversation) = conversations.get_mut(session_id) else {
+                return Ok(false);
+            };
+            if conversation.owner_id != owner_id {
+                return Ok(false);
+            }
+            conversation.project_id = project_id.map(str::to_owned);
+            conversation.order = order;
+            Ok(true)
+        }
+
+        async fn update_summary(
+            &self,
+            session_id: &str,
+            summary: &str,
+        ) -> Result<(), SessionRepositoryError> {
+            if let Some(conversation) = self.conversations.lock().unwrap().get_mut(session_id) {
+                conversation.summary = Some(summary.into());
+            }
+            Ok(())
+        }
+
+        async fn delete(
+            &self,
+            session_id: &str,
+            owner_id: &str,
+        ) -> Result<bool, SessionRepositoryError> {
+            let mut conversations = self.conversations.lock().unwrap();
+            if conversations
+                .get(session_id)
+                .is_some_and(|conversation| conversation.owner_id == owner_id)
+            {
+                conversations.remove(session_id);
+                return Ok(true);
+            }
+            Ok(false)
+        }
+
+        async fn clear_messages(
+            &self,
+            session_id: &str,
+            owner_id: &str,
+        ) -> Result<bool, SessionRepositoryError> {
+            if !self
+                .conversations
+                .lock()
+                .unwrap()
+                .get(session_id)
+                .is_some_and(|conversation| conversation.owner_id == owner_id)
+            {
+                return Ok(false);
+            }
+            self.messages.lock().unwrap().remove(session_id);
+            Ok(true)
+        }
     }
 
     async fn exercise_session_repository_contract(repository: &dyn SessionRepository) {
@@ -172,6 +338,14 @@ mod tests {
 
         let restored = repository.find_by_id(&created.id).await.unwrap().unwrap();
         assert_eq!(restored.title, "Quarterly review");
+        assert_eq!(
+            repository
+                .list_by_owner("owner-1", 10, None)
+                .await
+                .unwrap()
+                .len(),
+            1
+        );
 
         repository
             .append_message(

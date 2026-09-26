@@ -1,19 +1,23 @@
 mod agent;
+mod app;
+pub mod application;
 mod auth;
 mod commands;
 mod config;
-mod contracts;
+pub mod contracts;
 mod db;
 mod error;
 mod file_extract;
 mod files;
 mod image_ocr;
+pub mod infrastructure;
 mod llm;
 mod models;
-mod ports;
+pub mod ports;
 mod render;
 mod routes;
 mod state;
+mod transport;
 
 use std::net::SocketAddr;
 use tracing::info;
@@ -29,7 +33,14 @@ async fn start_axum_server() -> anyhow::Result<()> {
     cfg.ensure_dirs()?;
 
     let pool = state::init_db_pool().await;
+    let session_service = app::bootstrap::build_session_service(
+        &cfg.database_url,
+        cfg.db_max_connections,
+        pool.clone(),
+    )
+    .await?;
     state::set_db_pool(pool);
+    app::state::set_session_service(session_service)?;
 
     agent::tools::register_all_tools().await;
 

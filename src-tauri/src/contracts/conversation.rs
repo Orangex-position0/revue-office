@@ -9,6 +9,7 @@ pub struct Conversation {
     pub title: String,
     pub summary: Option<String>,
     pub message_count: i64,
+    #[serde(rename = "order_col")]
     pub order: i64,
     pub created_at: String,
     pub updated_at: String,
@@ -29,6 +30,21 @@ pub struct ConversationMessage {
     pub tool_calls: Option<Vec<serde_json::Value>>,
     pub tool_call_id: Option<String>,
     pub created_at: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ConversationDetail {
+    #[serde(flatten)]
+    pub conversation: Conversation,
+    pub messages: Vec<ConversationMessage>,
+    pub artifacts: Vec<ConversationArtifact>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ConversationUpdate {
+    pub title: Option<String>,
+    pub project_id: Option<Option<String>>,
+    pub order: Option<i64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
