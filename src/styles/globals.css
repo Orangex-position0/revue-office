@@ -1,0 +1,140 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+[data-display-theme='dark'] {
+  color-scheme: dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  [data-display-theme='system'] {
+    color-scheme: dark;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-surface-200;
+  }
+
+  :focus-visible {
+    outline: 3px solid rgba(14, 165, 233, 0.75);
+    outline-offset: 3px;
+  }
+  body {
+    @apply bg-surface-50 text-surface-900 font-sans antialiased;
+  }
+}
+
+[data-display-theme='dark'] body,
+[data-display-theme='dark'] #root {
+  background-color: #0f172a !important;
+  color: #e5e7eb;
+}
+
+[data-display-theme='dark'] [class*='bg-white'],
+[data-display-theme='dark'] [class*='bg-[#'],
+[data-display-theme='dark'] [class*='bg-surface-50'] {
+  background-color: #1e293b !important;
+}
+
+[data-display-theme='dark'] [class*='text-surface-950'],
+[data-display-theme='dark'] [class*='text-surface-900'],
+[data-display-theme='dark'] [class*='text-surface-800'] {
+  color: #f8fafc !important;
+}
+
+[data-display-theme='dark'] [class*='text-surface-700'],
+[data-display-theme='dark'] [class*='text-surface-650'],
+[data-display-theme='dark'] [class*='text-surface-600'],
+[data-display-theme='dark'] [class*='text-surface-500'] {
+  color: #cbd5e1 !important;
+}
+
+[data-display-theme='dark'] input,
+[data-display-theme='dark'] textarea,
+[data-display-theme='dark'] select {
+  background-color: #1e293b !important;
+  color: #f8fafc;
+  border-color: #475569;
+}
+
+@media (prefers-color-scheme: dark) {
+  [data-display-theme='system'] body,
+  [data-display-theme='system'] #root {
+    background-color: #0f172a !important;
+    color: #e5e7eb;
+  }
+
+  [data-display-theme='system'] [class*='bg-white'],
+  [data-display-theme='system'] [class*='bg-[#'],
+  [data-display-theme='system'] [class*='bg-surface-50'] {
+    background-color: #1e293b !important;
+  }
+
+  [data-display-theme='system'] [class*='text-surface-950'],
+  [data-display-theme='system'] [class*='text-surface-900'],
+  [data-display-theme='system'] [class*='text-surface-800'] {
+    color: #f8fafc !important;
+  }
+
+  [data-display-theme='system'] [class*='text-surface-700'],
+  [data-display-theme='system'] [class*='text-surface-650'],
+  [data-display-theme='system'] [class*='text-surface-600'],
+  [data-display-theme='system'] [class*='text-surface-500'] {
+    color: #cbd5e1 !important;
+  }
+
+  [data-display-theme='system'] input,
+  [data-display-theme='system'] textarea,
+  [data-display-theme='system'] select {
+    background-color: #1e293b !important;
+    color: #f8fafc;
+    border-color: #475569;
+  }
+}
+
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50;
+  }
+  .btn-primary {
+    @apply btn bg-primary-600 text-white hover:bg-primary-700 shadow-sm;
+  }
+  .btn-secondary {
+    @apply btn bg-white text-surface-700 border border-surface-200 hover:bg-surface-50;
+  }
+  .btn-ghost {
+    @apply btn text-surface-600 hover:bg-surface-100;
+  }
+
+  .workspace-panel {
+    @apply border border-white/60 bg-white/45 shadow-[0_18px_50px_rgba(15,23,42,0.08)] backdrop-blur-xl;
+  }
+  .card {
+    @apply rounded-xl border border-surface-200 bg-white shadow-sm;
+  }
+  .input {
+    @apply w-full rounded-lg border border-surface-200 bg-white px-3 py-2 text-sm placeholder:text-surface-400 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100;
+  }
+}
+
+/* 自定义滚动条 */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #d4d4d8;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #a1a1aa;
+}
