@@ -1,27 +1,10 @@
 -- ============================================================
--- revueOffice MySQL 初始化脚本
--- 每次启动会先 DROP 再 CREATE，清空旧数据重建表结构
+-- revueOffice MySQL baseline migration
+-- Non-destructive and safe to execute repeatedly on existing databases.
 -- ============================================================
 
--- ── 临时关闭外键检查，避免 DROP 顺序冲突 ──
-SET FOREIGN_KEY_CHECKS = 0;
-
-DROP TABLE IF EXISTS users;
-DROP TABLE IF EXISTS projects;
-DROP TABLE IF EXISTS sessions;
-DROP TABLE IF EXISTS messages;
-DROP TABLE IF EXISTS session_artifacts;
-DROP TABLE IF EXISTS tasks;
-DROP TABLE IF EXISTS folders;
-DROP TABLE IF EXISTS files;
-DROP TABLE IF EXISTS notifications;
-DROP TABLE IF EXISTS user_settings;
-DROP TABLE IF EXISTS system_settings;
-
-SET FOREIGN_KEY_CHECKS = 1;
-
 -- 用户表
-CREATE TABLE users (
+CREATE TABLE IF NOT EXISTS users (
     id VARCHAR(36) PRIMARY KEY,
     username VARCHAR(255) UNIQUE NOT NULL,
     email VARCHAR(255) UNIQUE,
@@ -33,7 +16,7 @@ CREATE TABLE users (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- 项目表
-CREATE TABLE projects (
+CREATE TABLE IF NOT EXISTS projects (
     id VARCHAR(36) PRIMARY KEY,
     title VARCHAR(500) NOT NULL,
     description VARCHAR(2000),
@@ -47,7 +30,7 @@ CREATE TABLE projects (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- 会话表
-CREATE TABLE sessions (
+CREATE TABLE IF NOT EXISTS sessions (
     id VARCHAR(36) PRIMARY KEY,
     owner_id VARCHAR(36) NOT NULL,
     project_id VARCHAR(36),
@@ -63,7 +46,7 @@ CREATE TABLE sessions (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- 会话消息表
-CREATE TABLE messages (
+CREATE TABLE IF NOT EXISTS messages (
     id VARCHAR(36) PRIMARY KEY,
     session_id VARCHAR(36) NOT NULL,
     role VARCHAR(50) NOT NULL,
@@ -76,7 +59,7 @@ CREATE TABLE messages (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- 会话产物表
-CREATE TABLE session_artifacts (
+CREATE TABLE IF NOT EXISTS session_artifacts (
     id VARCHAR(36) PRIMARY KEY,
     session_id VARCHAR(36) NOT NULL UNIQUE,
     payload LONGTEXT NOT NULL,
@@ -86,7 +69,7 @@ CREATE TABLE session_artifacts (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- 任务表
-CREATE TABLE tasks (
+CREATE TABLE IF NOT EXISTS tasks (
     id VARCHAR(36) PRIMARY KEY,
     owner_id VARCHAR(36) NOT NULL,
     title VARCHAR(500) NOT NULL,
@@ -106,7 +89,7 @@ CREATE TABLE tasks (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- 文件夹表
-CREATE TABLE folders (
+CREATE TABLE IF NOT EXISTS folders (
     id VARCHAR(36) PRIMARY KEY,
     owner_id VARCHAR(36) NOT NULL,
     name VARCHAR(500) NOT NULL,
@@ -117,7 +100,7 @@ CREATE TABLE folders (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- 文件表
-CREATE TABLE files (
+CREATE TABLE IF NOT EXISTS files (
     id VARCHAR(36) PRIMARY KEY,
     owner_id VARCHAR(36) NOT NULL,
     name VARCHAR(500) NOT NULL,
@@ -134,7 +117,7 @@ CREATE TABLE files (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- 通知表
-CREATE TABLE notifications (
+CREATE TABLE IF NOT EXISTS notifications (
     id VARCHAR(36) PRIMARY KEY,
     user_id VARCHAR(36) NOT NULL,
     type VARCHAR(100) NOT NULL,
@@ -148,7 +131,7 @@ CREATE TABLE notifications (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- 用户设置表
-CREATE TABLE user_settings (
+CREATE TABLE IF NOT EXISTS user_settings (
     id VARCHAR(36) PRIMARY KEY,
     user_id VARCHAR(36) NOT NULL UNIQUE,
     payload LONGTEXT NOT NULL,
@@ -158,7 +141,7 @@ CREATE TABLE user_settings (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- 系统设置表
-CREATE TABLE system_settings (
+CREATE TABLE IF NOT EXISTS system_settings (
     `key` VARCHAR(255) PRIMARY KEY,
     payload LONGTEXT NOT NULL,
     created_at VARCHAR(50) NOT NULL,
