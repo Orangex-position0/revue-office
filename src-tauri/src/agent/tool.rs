@@ -130,6 +130,59 @@ pub trait OfficeTool: Send + Sync {
 /// 便利类型别名
 pub type DynTool = Arc<dyn OfficeTool>;
 
+/// Typed, backpressured progress channel for migrated tools.
+#[derive(Clone)]
+pub struct ToolProgressSink {
+    tool: String,
+    events: super::runtime::RuntimeEventSink,
+}
+
+impl ToolProgressSink {
+    pub(crate) fn new(tool: String, events: super::runtime::RuntimeEventSink) -> Self {
+        Self { tool, events }
+    }
+
+    pub async fn started(
+        &self,
+        input: serde_json::Value,
+    ) -> Result<(), super::runtime::RuntimeError> {
+        self.events
+            .emit(super::event::RuntimeEvent::ToolStarted {
+                tool: self.tool.clone(),
+                input,
+            })
+            .await
+    }
+
+    pub async fn progress(
+        &self,
+        stage: impl Into<String>,
+        detail: serde_json::Value,
+    ) -> Result<(), super::runtime::RuntimeError> {
+        self.events
+            .emit(super::event::RuntimeEvent::ToolProgress {
+                tool: self.tool.clone(),
+                stage: stage.into(),
+                detail,
+            })
+            .await
+    }
+
+    pub async fn finished(
+        &self,
+        success: bool,
+        result: serde_json::Value,
+    ) -> Result<(), super::runtime::RuntimeError> {
+        self.events
+            .emit(super::event::RuntimeEvent::ToolFinished {
+                tool: self.tool.clone(),
+                success,
+                result,
+            })
+            .await
+    }
+}
+
 impl ToolResult {
     pub fn with_data(mut self, data: serde_json::Value) -> Self {
         self.data = Some(data);
