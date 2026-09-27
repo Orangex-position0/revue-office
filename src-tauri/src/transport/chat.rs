@@ -5,7 +5,6 @@ use axum::response::sse::{Event, KeepAlive, Sse};
 use axum::routing::post;
 use axum::{Json, Router};
 use futures::{Stream, StreamExt};
-use tokio_stream::wrappers::ReceiverStream;
 
 use super::error::chat_start_error;
 use super::sse::application_event_frame;
@@ -60,7 +59,8 @@ async fn chat_stream(
         .await
         .map_err(chat_start_error)?;
     let session_id = run.session_id;
-    let stream = ReceiverStream::new(run.events)
+    let stream = run
+        .events
         .map(move |event| Ok(application_event_frame(&session_id, event).into_event()));
 
     Ok(Sse::new(stream).keep_alive(KeepAlive::new().interval(Duration::from_secs(15))))

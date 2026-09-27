@@ -54,6 +54,7 @@ impl RuntimeEvent {
 #[serde(rename_all = "snake_case")]
 pub enum RuntimeFailureKind {
     Cancelled,
+    Timeout,
     Model,
     Tool,
     Internal,

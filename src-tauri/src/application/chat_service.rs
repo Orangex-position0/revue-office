@@ -1,5 +1,8 @@
+use std::pin::Pin;
 use std::sync::Arc;
+use std::task::{Context, Poll};
 
+use futures::Stream;
 use tokio::sync::mpsc;
 
 use super::error::ChatApplicationError;
@@ -24,9 +27,34 @@ pub struct ChatCommand {
     pub max_turns: usize,
 }
 
+pub struct ChatEventStream {
+    receiver: mpsc::Receiver<ApplicationEvent>,
+    cancellation: RuntimeCancellationHandle,
+}
+
+impl ChatEventStream {
+    pub async fn recv(&mut self) -> Option<ApplicationEvent> {
+        self.receiver.recv().await
+    }
+}
+
+impl Stream for ChatEventStream {
+    type Item = ApplicationEvent;
+
+    fn poll_next(mut self: Pin<&mut Self>, context: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        self.receiver.poll_recv(context)
+    }
+}
+
+impl Drop for ChatEventStream {
+    fn drop(&mut self) {
+        self.cancellation.cancel();
+    }
+}
+
 pub struct ChatRunHandle {
     pub session_id: String,
-    pub events: mpsc::Receiver<ApplicationEvent>,
+    pub events: ChatEventStream,
     cancellation: RuntimeCancellationHandle,
 }
 
@@ -157,10 +185,9 @@ impl ChatApplicationService {
                         success,
                         result,
                     },
-                    RuntimeEvent::ArtifactProduced { artifact } => ApplicationEvent::StateChanged {
-                        state: "artifact_pending".into(),
-                        detail: serde_json::json!({"artifact": artifact}),
-                    },
+                    RuntimeEvent::ArtifactProduced { artifact } => {
+                        ApplicationEvent::ArtifactUpdated { artifact }
+                    }
                     RuntimeEvent::MessageProduced { content } => {
                         if repository
                             .append_message(
@@ -229,7 +256,10 @@ impl ChatApplicationService {
 
         Ok(ChatRunHandle {
             session_id: conversation.id,
-            events: application_events,
+            events: ChatEventStream {
+                receiver: application_events,
+                cancellation: cancellation.clone(),
+            },
             cancellation,
         })
     }

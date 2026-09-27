@@ -22,6 +22,7 @@ pub async fn build_application_services(
     database_url: &str,
     max_connections: u32,
     artifact_root: impl Into<PathBuf>,
+    runtime_timeout: std::time::Duration,
 ) -> anyhow::Result<ApplicationServices> {
     let (session_repository, artifact_repository): (
         Arc<dyn SessionRepository>,
@@ -47,9 +48,10 @@ pub async fn build_application_services(
             "reconciled pending artifact publications"
         );
     }
-    let runtime = Arc::new(AgentRuntime::new(
+    let runtime = Arc::new(AgentRuntime::with_timeout(
         Arc::new(LegacyAgentRuntimeDriver::new(artifact.clone())),
         256,
+        runtime_timeout,
     ));
 
     Ok(ApplicationServices {

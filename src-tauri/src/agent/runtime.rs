@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use std::time::Duration;
 
 use async_trait::async_trait;
 use thiserror::Error;
@@ -12,6 +13,8 @@ use crate::contracts::agent_run::{RuntimeCompletion, RuntimeRequest};
 pub enum RuntimeError {
     #[error("runtime was cancelled")]
     Cancelled,
+    #[error("runtime timed out")]
+    Timeout,
     #[error("model failed: {0}")]
     Model(String),
     #[error("tool failed: {0}")]
@@ -28,6 +31,7 @@ impl RuntimeError {
     fn failure_kind(&self) -> RuntimeFailureKind {
         match self {
             Self::Cancelled => RuntimeFailureKind::Cancelled,
+            Self::Timeout => RuntimeFailureKind::Timeout,
             Self::Model(_) => RuntimeFailureKind::Model,
             Self::Tool(_) => RuntimeFailureKind::Tool,
             Self::EventStreamClosed | Self::TerminalEventOwnedByRuntime | Self::Internal(_) => {
@@ -111,13 +115,23 @@ impl AgentRunHandle {
 pub struct AgentRuntime {
     driver: Arc<dyn RuntimeDriver>,
     event_capacity: usize,
+    run_timeout: Duration,
 }
 
 impl AgentRuntime {
     pub fn new(driver: Arc<dyn RuntimeDriver>, event_capacity: usize) -> Self {
+        Self::with_timeout(driver, event_capacity, Duration::from_secs(30 * 60))
+    }
+
+    pub fn with_timeout(
+        driver: Arc<dyn RuntimeDriver>,
+        event_capacity: usize,
+        run_timeout: Duration,
+    ) -> Self {
         Self {
             driver,
             event_capacity: event_capacity.max(1),
+            run_timeout: run_timeout.max(Duration::from_millis(1)),
         }
     }
 
@@ -126,6 +140,7 @@ impl AgentRuntime {
         let (sender, receiver) = mpsc::channel(self.event_capacity);
         let (cancel_sender, cancel_receiver) = watch::channel(false);
         let driver = self.driver.clone();
+        let run_timeout = self.run_timeout;
         let driver_events = RuntimeEventSink {
             sender: sender.clone(),
         };
@@ -140,6 +155,7 @@ impl AgentRuntime {
             let outcome = tokio::select! {
                 biased;
                 _ = runtime_cancellation.cancelled() => Err(RuntimeError::Cancelled),
+                _ = tokio::time::sleep(run_timeout) => Err(RuntimeError::Timeout),
                 outcome = driver.execute(request, driver_events, driver_cancellation) => outcome,
             };
             let terminal = match outcome {

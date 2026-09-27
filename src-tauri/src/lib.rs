@@ -38,6 +38,7 @@ async fn start_axum_server() -> anyhow::Result<()> {
         &cfg.database_url,
         cfg.db_max_connections,
         std::path::Path::new(&cfg.data_dir).join("artifacts"),
+        std::time::Duration::from_millis(cfg.llm_tool_timeout_ms),
     )
     .await?;
     state::set_db_pool(pool);
