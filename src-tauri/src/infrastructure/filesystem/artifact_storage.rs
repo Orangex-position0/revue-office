@@ -116,6 +116,50 @@ impl FileStorage for LocalArtifactStorage {
         })
     }
 
+    async fn recover_staging(
+        &self,
+        staging_path: &str,
+    ) -> Result<Option<ReadyArtifactFile>, FileStorageError> {
+        let staging_path = self.checked_path(staging_path)?;
+        if staging_path.parent() != Some(self.root.join("staging").as_path()) {
+            return Err(FileStorageError::InvalidPath(
+                staging_path.to_string_lossy().into_owned(),
+            ));
+        }
+        let filename = staging_path.file_name().ok_or_else(|| {
+            FileStorageError::InvalidPath(staging_path.to_string_lossy().into_owned())
+        })?;
+        let final_path = self.root.join("ready").join(filename);
+        match tokio::fs::metadata(&staging_path).await {
+            Ok(metadata) if metadata.is_file() && metadata.len() > 0 => {
+                let file = StagedArtifactFile {
+                    path: staging_path.to_string_lossy().into_owned(),
+                    final_path: final_path.to_string_lossy().into_owned(),
+                };
+                self.promote(&file).await.map(Some)
+            }
+            Ok(_) => Err(FileStorageError::InvalidFile(
+                staging_path.to_string_lossy().into_owned(),
+            )),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                match tokio::fs::metadata(&final_path).await {
+                    Ok(metadata) if metadata.is_file() && metadata.len() > 0 => {
+                        Ok(Some(ReadyArtifactFile {
+                            path: final_path.to_string_lossy().into_owned(),
+                            size: metadata.len(),
+                        }))
+                    }
+                    Ok(_) => Err(FileStorageError::InvalidFile(
+                        final_path.to_string_lossy().into_owned(),
+                    )),
+                    Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
+                    Err(error) => Err(FileStorageError::Io(error)),
+                }
+            }
+            Err(error) => Err(FileStorageError::Io(error)),
+        }
+    }
+
     async fn delete(&self, path: &str) -> Result<(), FileStorageError> {
         let path = self.checked_path(path)?;
         match tokio::fs::remove_file(path).await {

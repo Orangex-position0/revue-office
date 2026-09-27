@@ -20,6 +20,12 @@ pub enum ArtifactServiceError {
     FinalizationConflict,
 }
 
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct ArtifactReconciliationReport {
+    pub recovered: usize,
+    pub failed: usize,
+}
+
 pub struct ArtifactService {
     repository: Arc<dyn ArtifactPublicationRepository>,
     storage: Arc<dyn FileStorage>,
@@ -56,6 +62,7 @@ impl ArtifactService {
             .await?;
 
         if let Err(error) = self.storage.write_staging(&staged_file, &draft.bytes).await {
+            let _ = self.storage.delete(&staged_file.path).await;
             let _ = self
                 .repository
                 .fail(&publication.id, &error.to_string())
@@ -96,6 +103,10 @@ impl ArtifactService {
             Ok(Some(ready)) => Ok(ready),
             Ok(None) => {
                 let _ = self.storage.delete(&ready_file.path).await;
+                let _ = self
+                    .repository
+                    .fail(&publication.id, "artifact finalization conflict")
+                    .await;
                 Err(ArtifactServiceError::FinalizationConflict)
             }
             Err(error) => {
@@ -107,6 +118,65 @@ impl ArtifactService {
                 Err(error.into())
             }
         }
+    }
+
+    pub async fn reconcile_pending(
+        &self,
+    ) -> Result<ArtifactReconciliationReport, ArtifactServiceError> {
+        let pending = self.repository.pending().await?;
+        let mut report = ArtifactReconciliationReport::default();
+        for publication in pending {
+            match self
+                .storage
+                .recover_staging(
+                    publication
+                        .staging_path
+                        .as_deref()
+                        .ok_or(ArtifactServiceError::FinalizationConflict)?,
+                )
+                .await
+            {
+                Ok(Some(file)) => {
+                    let content = with_file_metadata(publication.content, &file.path, file.size);
+                    match self
+                        .repository
+                        .finalize(
+                            &publication.id,
+                            ArtifactFinalization {
+                                final_path: file.path.clone(),
+                                content,
+                            },
+                        )
+                        .await?
+                    {
+                        Some(_) => report.recovered += 1,
+                        None => {
+                            let _ = self.storage.delete(&file.path).await;
+                            return Err(ArtifactServiceError::FinalizationConflict);
+                        }
+                    }
+                }
+                Ok(None) => {
+                    self.repository
+                        .fail(
+                            &publication.id,
+                            "staging and final artifact files are missing",
+                        )
+                        .await?;
+                    report.failed += 1;
+                }
+                Err(error) => {
+                    if let Some(path) = &publication.staging_path {
+                        let _ = self.storage.delete(path).await;
+                    }
+                    self.repository
+                        .fail(&publication.id, &error.to_string())
+                        .await?;
+                    report.failed += 1;
+                }
+            }
+        }
+        Ok(report)
     }
 }
 

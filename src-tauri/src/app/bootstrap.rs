@@ -39,6 +39,14 @@ pub async fn build_application_services(
         artifact_repository,
         Arc::new(LocalArtifactStorage::new(artifact_root)),
     ));
+    let reconciliation = artifact.reconcile_pending().await?;
+    if reconciliation.recovered > 0 || reconciliation.failed > 0 {
+        tracing::info!(
+            recovered = reconciliation.recovered,
+            failed = reconciliation.failed,
+            "reconciled pending artifact publications"
+        );
+    }
     let runtime = Arc::new(AgentRuntime::new(
         Arc::new(LegacyAgentRuntimeDriver::new(artifact.clone())),
         256,

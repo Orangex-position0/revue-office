@@ -44,5 +44,11 @@ pub trait FileStorage: Send + Sync {
         file: &StagedArtifactFile,
     ) -> Result<ReadyArtifactFile, FileStorageError>;
 
+    /// Recover a publication interrupted before or after the atomic promote.
+    async fn recover_staging(
+        &self,
+        staging_path: &str,
+    ) -> Result<Option<ReadyArtifactFile>, FileStorageError>;
+
     async fn delete(&self, path: &str) -> Result<(), FileStorageError>;
 }
