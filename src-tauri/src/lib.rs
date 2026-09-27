@@ -17,7 +17,7 @@ pub mod ports;
 mod render;
 mod routes;
 mod state;
-mod transport;
+pub mod transport;
 
 use std::net::SocketAddr;
 use tracing::info;
@@ -33,10 +33,11 @@ async fn start_axum_server() -> anyhow::Result<()> {
     cfg.ensure_dirs()?;
 
     let pool = state::init_db_pool().await;
-    let session_service =
-        app::bootstrap::build_session_service(&cfg.database_url, cfg.db_max_connections).await?;
+    let services =
+        app::bootstrap::build_application_services(&cfg.database_url, cfg.db_max_connections)
+            .await?;
     state::set_db_pool(pool);
-    app::state::set_session_service(session_service)?;
+    app::state::set_services(services.session, services.chat)?;
 
     agent::tools::register_all_tools().await;
 
