@@ -101,6 +101,24 @@ pub(crate) async fn run_migrations_sqlite(pool: &sqlx::SqlitePool) -> Result<()>
             .await?;
     }
 
+    let artifact_publications_applied: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM _revue_migrations WHERE version = ?")
+            .bind(3_i64)
+            .fetch_one(pool)
+            .await?;
+    if artifact_publications_applied == 0 {
+        sqlx::raw_sql(include_str!(
+            "../../migrations/002_artifact_publications.sql"
+        ))
+        .execute(pool)
+        .await?;
+        sqlx::query("INSERT INTO _revue_migrations (version, name) VALUES (?, ?)")
+            .bind(3_i64)
+            .bind("artifact_publications")
+            .execute(pool)
+            .await?;
+    }
+
     Ok(())
 }
 
@@ -128,6 +146,24 @@ pub(crate) async fn run_migrations_mysql(pool: &sqlx::MySqlPool) -> Result<()> {
         sqlx::query("INSERT INTO _revue_migrations (version, name) VALUES (?, ?)")
             .bind(1_i64)
             .bind("baseline_schema")
+            .execute(pool)
+            .await?;
+    }
+
+    let artifact_publications_applied: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM _revue_migrations WHERE version = ?")
+            .bind(3_i64)
+            .fetch_one(pool)
+            .await?;
+    if artifact_publications_applied == 0 {
+        sqlx::raw_sql(include_str!(
+            "../../migrations/002_artifact_publications_mysql.sql"
+        ))
+        .execute(pool)
+        .await?;
+        sqlx::query("INSERT INTO _revue_migrations (version, name) VALUES (?, ?)")
+            .bind(3_i64)
+            .bind("artifact_publications")
             .execute(pool)
             .await?;
     }

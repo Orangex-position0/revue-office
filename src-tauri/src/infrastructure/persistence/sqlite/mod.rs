@@ -2,8 +2,14 @@ use async_trait::async_trait;
 use sqlx::sqlite::SqlitePoolOptions;
 use sqlx::{Row, SqlitePool};
 
+use crate::contracts::artifact::{
+    ArtifactFinalization, ArtifactPublication, ArtifactPublicationStatus, NewArtifactPublication,
+};
 use crate::contracts::conversation::{
     Conversation, ConversationArtifact, ConversationMessage, NewConversation,
+};
+use crate::ports::repositories::artifact_publication::{
+    ArtifactPublicationRepository, ArtifactPublicationRepositoryError,
 };
 use crate::ports::repositories::session::{SessionRepository, SessionRepositoryError};
 
@@ -340,5 +346,134 @@ impl SessionRepository for SqliteSessionRepository {
             .map_err(Self::unavailable)?;
         transaction.commit().await.map_err(Self::unavailable)?;
         Ok(true)
+    }
+}
+
+fn sqlite_artifact_publication(
+    row: &sqlx::sqlite::SqliteRow,
+) -> Result<ArtifactPublication, ArtifactPublicationRepositoryError> {
+    let unavailable =
+        |error| ArtifactPublicationRepositoryError::Unavailable(anyhow::Error::new(error));
+    let status: String = row.try_get("status").map_err(unavailable)?;
+    let content: String = row.try_get("content").map_err(unavailable)?;
+    Ok(ArtifactPublication {
+        id: row.try_get("id").map_err(unavailable)?,
+        session_id: row.try_get("session_id").map_err(unavailable)?,
+        owner_id: row.try_get("owner_id").map_err(unavailable)?,
+        kind: row.try_get("kind").map_err(unavailable)?,
+        title: row.try_get("title").map_err(unavailable)?,
+        status: ArtifactPublicationStatus::try_from(status.as_str())
+            .map_err(ArtifactPublicationRepositoryError::InvalidData)?,
+        content: serde_json::from_str(&content)
+            .map_err(|error| ArtifactPublicationRepositoryError::InvalidData(error.to_string()))?,
+        staging_path: row.try_get("staging_path").map_err(unavailable)?,
+        final_path: row.try_get("final_path").map_err(unavailable)?,
+        error: row.try_get("error").map_err(unavailable)?,
+        version: row.try_get("version").map_err(unavailable)?,
+        created_at: row.try_get("created_at").map_err(unavailable)?,
+        updated_at: row.try_get("updated_at").map_err(unavailable)?,
+    })
+}
+
+#[async_trait]
+impl ArtifactPublicationRepository for SqliteSessionRepository {
+    async fn reserve(
+        &self,
+        publication: NewArtifactPublication,
+    ) -> Result<ArtifactPublication, ArtifactPublicationRepositoryError> {
+        let id = uuid::Uuid::new_v4().to_string();
+        let now = chrono::Utc::now().to_rfc3339();
+        let content = serde_json::to_string(&publication.content)
+            .map_err(|error| ArtifactPublicationRepositoryError::InvalidData(error.to_string()))?;
+        sqlx::query(
+            "INSERT INTO artifact_publications (id, session_id, owner_id, kind, title, status, content, staging_path, version, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 'publishing', ?, ?, 1, ?, ?)",
+        )
+        .bind(&id)
+        .bind(&publication.session_id)
+        .bind(&publication.owner_id)
+        .bind(&publication.kind)
+        .bind(&publication.title)
+        .bind(content)
+        .bind(&publication.staging_path)
+        .bind(&now)
+        .bind(&now)
+        .execute(&self.pool)
+        .await
+        .map_err(|error| ArtifactPublicationRepositoryError::Unavailable(anyhow::Error::new(error)))?;
+        Ok(ArtifactPublication {
+            id,
+            session_id: publication.session_id,
+            owner_id: publication.owner_id,
+            kind: publication.kind,
+            title: publication.title,
+            status: ArtifactPublicationStatus::Publishing,
+            content: publication.content,
+            staging_path: Some(publication.staging_path),
+            final_path: None,
+            error: None,
+            version: 1,
+            created_at: now.clone(),
+            updated_at: now,
+        })
+    }
+
+    async fn find(
+        &self,
+        id: &str,
+    ) -> Result<Option<ArtifactPublication>, ArtifactPublicationRepositoryError> {
+        let row = sqlx::query("SELECT * FROM artifact_publications WHERE id = ?")
+            .bind(id)
+            .fetch_optional(&self.pool)
+            .await
+            .map_err(|error| {
+                ArtifactPublicationRepositoryError::Unavailable(anyhow::Error::new(error))
+            })?;
+        row.as_ref().map(sqlite_artifact_publication).transpose()
+    }
+
+    async fn finalize(
+        &self,
+        id: &str,
+        finalization: ArtifactFinalization,
+    ) -> Result<Option<ArtifactPublication>, ArtifactPublicationRepositoryError> {
+        let content = serde_json::to_string(&finalization.content)
+            .map_err(|error| ArtifactPublicationRepositoryError::InvalidData(error.to_string()))?;
+        let result = sqlx::query("UPDATE artifact_publications SET status = 'ready', content = ?, final_path = ?, staging_path = NULL, error = NULL, updated_at = ? WHERE id = ? AND status = 'publishing'")
+            .bind(content)
+            .bind(finalization.final_path)
+            .bind(chrono::Utc::now().to_rfc3339())
+            .bind(id)
+            .execute(&self.pool)
+            .await
+            .map_err(|error| ArtifactPublicationRepositoryError::Unavailable(anyhow::Error::new(error)))?;
+        if result.rows_affected() == 0 {
+            return Ok(None);
+        }
+        self.find(id).await
+    }
+
+    async fn fail(
+        &self,
+        id: &str,
+        error: &str,
+    ) -> Result<bool, ArtifactPublicationRepositoryError> {
+        let result = sqlx::query("UPDATE artifact_publications SET status = 'failed', error = ?, updated_at = ? WHERE id = ? AND status = 'publishing'")
+            .bind(error)
+            .bind(chrono::Utc::now().to_rfc3339())
+            .bind(id)
+            .execute(&self.pool)
+            .await
+            .map_err(|source| ArtifactPublicationRepositoryError::Unavailable(anyhow::Error::new(source)))?;
+        Ok(result.rows_affected() > 0)
+    }
+
+    async fn pending(
+        &self,
+    ) -> Result<Vec<ArtifactPublication>, ArtifactPublicationRepositoryError> {
+        let rows = sqlx::query("SELECT * FROM artifact_publications WHERE status = 'publishing' ORDER BY created_at ASC")
+            .fetch_all(&self.pool)
+            .await
+            .map_err(|error| ArtifactPublicationRepositoryError::Unavailable(anyhow::Error::new(error)))?;
+        rows.iter().map(sqlite_artifact_publication).collect()
     }
 }
