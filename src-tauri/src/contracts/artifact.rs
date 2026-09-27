@@ -33,12 +33,24 @@ impl TryFrom<&str> for ArtifactPublicationStatus {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NewArtifactPublication {
+    pub id: String,
     pub session_id: String,
     pub owner_id: String,
     pub kind: String,
     pub title: String,
     pub content: serde_json::Value,
     pub staging_path: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ArtifactDraft {
+    pub session_id: String,
+    pub owner_id: String,
+    pub kind: String,
+    pub title: String,
+    pub extension: String,
+    pub content: serde_json::Value,
+    pub bytes: Vec<u8>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

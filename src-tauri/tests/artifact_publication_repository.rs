@@ -10,6 +10,7 @@ use revue_office_lib::ports::repositories::artifact_publication::ArtifactPublica
 async fn exercise_repository(repository: Arc<dyn ArtifactPublicationRepository>) {
     let ready_candidate = repository
         .reserve(NewArtifactPublication {
+            id: uuid::Uuid::new_v4().to_string(),
             session_id: "session-1".into(),
             owner_id: "owner-1".into(),
             kind: "presentation".into(),
@@ -42,6 +43,7 @@ async fn exercise_repository(repository: Arc<dyn ArtifactPublicationRepository>)
 
     let failed_candidate = repository
         .reserve(NewArtifactPublication {
+            id: uuid::Uuid::new_v4().to_string(),
             session_id: "session-1".into(),
             owner_id: "owner-1".into(),
             kind: "document".into(),

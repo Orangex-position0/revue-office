@@ -381,14 +381,13 @@ impl ArtifactPublicationRepository for MySqlSessionRepository {
         &self,
         publication: NewArtifactPublication,
     ) -> Result<ArtifactPublication, ArtifactPublicationRepositoryError> {
-        let id = uuid::Uuid::new_v4().to_string();
         let now = chrono::Utc::now().to_rfc3339();
         let content = serde_json::to_string(&publication.content)
             .map_err(|error| ArtifactPublicationRepositoryError::InvalidData(error.to_string()))?;
         sqlx::query(
             "INSERT INTO artifact_publications (id, session_id, owner_id, kind, title, status, content, staging_path, version, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 'publishing', ?, ?, 1, ?, ?)",
         )
-        .bind(&id)
+        .bind(&publication.id)
         .bind(&publication.session_id)
         .bind(&publication.owner_id)
         .bind(&publication.kind)
@@ -401,7 +400,7 @@ impl ArtifactPublicationRepository for MySqlSessionRepository {
         .await
         .map_err(|error| ArtifactPublicationRepositoryError::Unavailable(anyhow::Error::new(error)))?;
         Ok(ArtifactPublication {
-            id,
+            id: publication.id,
             session_id: publication.session_id,
             owner_id: publication.owner_id,
             kind: publication.kind,
