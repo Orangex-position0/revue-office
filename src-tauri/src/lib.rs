@@ -1,4 +1,4 @@
-mod agent;
+pub mod agent;
 mod app;
 pub mod application;
 mod auth;

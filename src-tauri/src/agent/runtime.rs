@@ -85,15 +85,26 @@ pub trait RuntimeDriver: Send + Sync {
     ) -> Result<RuntimeCompletion, RuntimeError>;
 }
 
+#[derive(Clone)]
+pub struct RuntimeCancellationHandle {
+    sender: watch::Sender<bool>,
+}
+
+impl RuntimeCancellationHandle {
+    pub fn cancel(&self) {
+        let _ = self.sender.send(true);
+    }
+}
+
 pub struct AgentRunHandle {
     pub run_id: String,
     pub events: mpsc::Receiver<RuntimeEvent>,
-    cancellation: watch::Sender<bool>,
+    pub cancellation: RuntimeCancellationHandle,
 }
 
 impl AgentRunHandle {
     pub fn cancel(&self) {
-        let _ = self.cancellation.send(true);
+        self.cancellation.cancel();
     }
 }
 
@@ -146,7 +157,9 @@ impl AgentRuntime {
         AgentRunHandle {
             run_id,
             events: receiver,
-            cancellation: cancel_sender,
+            cancellation: RuntimeCancellationHandle {
+                sender: cancel_sender,
+            },
         }
     }
 }
