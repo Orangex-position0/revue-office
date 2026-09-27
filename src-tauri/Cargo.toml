@@ -70,6 +70,9 @@ zip = "2"
 # Other
 async-trait = "0.1"
 
+[dev-dependencies]
+syn = { version = "2", features = ["full", "visit"] }
+
 # Read the optimization guideline for more details: https://tauri.app/concept/size/#cargo-configuration
 [profile.release]
 codegen-units = 1
