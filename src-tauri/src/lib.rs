@@ -2,6 +2,7 @@ pub mod agent;
 mod app;
 pub mod application;
 mod auth;
+pub mod capabilities;
 mod commands;
 mod config;
 pub mod contracts;
