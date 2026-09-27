@@ -176,6 +176,11 @@ mod tests {
             run_id: "run-1".into(),
             session_id: "session-1".into(),
             user_id: "user-1".into(),
+            project_id: None,
+            preferred_model: None,
+            attachments: Vec::new(),
+            tool_config: None,
+            allowed_tools: Some(Vec::new()),
             history: vec![RuntimeMessage {
                 role: "user".into(),
                 content: "earlier".into(),

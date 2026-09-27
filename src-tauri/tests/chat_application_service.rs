@@ -197,6 +197,11 @@ async fn chat_application_service_creates_session_persists_messages_and_publishe
             session_id: None,
             project_id: None,
             message: "Hello application boundary".into(),
+            runtime_message: None,
+            preferred_model: None,
+            attachments: Vec::new(),
+            tool_config: None,
+            allowed_tools: Some(Vec::new()),
             max_turns: 4,
         })
         .await
@@ -254,6 +259,11 @@ async fn chat_application_service_publishes_exactly_one_failed_terminal() {
             session_id: None,
             project_id: None,
             message: "Fail safely".into(),
+            runtime_message: None,
+            preferred_model: None,
+            attachments: Vec::new(),
+            tool_config: None,
+            allowed_tools: Some(Vec::new()),
             max_turns: 4,
         })
         .await
@@ -310,6 +320,11 @@ async fn chat_application_service_restores_owned_history_before_starting_runtime
             session_id: Some("existing-session".into()),
             project_id: None,
             message: "Continue".into(),
+            runtime_message: None,
+            preferred_model: None,
+            attachments: Vec::new(),
+            tool_config: None,
+            allowed_tools: Some(Vec::new()),
             max_turns: 4,
         })
         .await

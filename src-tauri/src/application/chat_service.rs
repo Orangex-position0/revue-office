@@ -6,7 +6,7 @@ use super::error::ChatApplicationError;
 use super::event::ApplicationEvent;
 use crate::agent::event::RuntimeEvent;
 use crate::agent::runtime::{AgentRuntime, RuntimeCancellationHandle};
-use crate::contracts::agent_run::{RuntimeMessage, RuntimeRequest};
+use crate::contracts::agent_run::{RuntimeAttachment, RuntimeMessage, RuntimeRequest};
 use crate::contracts::conversation::{ConversationMessage, NewConversation};
 use crate::ports::repositories::session::SessionRepository;
 
@@ -16,6 +16,11 @@ pub struct ChatCommand {
     pub session_id: Option<String>,
     pub project_id: Option<String>,
     pub message: String,
+    pub runtime_message: Option<String>,
+    pub preferred_model: Option<String>,
+    pub attachments: Vec<RuntimeAttachment>,
+    pub tool_config: Option<serde_json::Value>,
+    pub allowed_tools: Option<Vec<String>>,
     pub max_turns: usize,
 }
 
@@ -98,6 +103,11 @@ impl ChatApplicationService {
             run_id: uuid::Uuid::new_v4().to_string(),
             session_id: conversation.id.clone(),
             user_id: command.owner_id,
+            project_id: command.project_id,
+            preferred_model: command.preferred_model,
+            attachments: command.attachments,
+            tool_config: command.tool_config,
+            allowed_tools: command.allowed_tools,
             history: history
                 .into_iter()
                 .map(|message| RuntimeMessage {
@@ -105,7 +115,7 @@ impl ChatApplicationService {
                     content: message.content,
                 })
                 .collect(),
-            user_message: message,
+            user_message: command.runtime_message.unwrap_or(message),
             max_turns: command.max_turns.max(1),
         });
         let cancellation = runtime_handle.cancellation.clone();
@@ -181,6 +191,12 @@ impl ChatApplicationService {
                         state: "turn_finished".into(),
                         detail: serde_json::json!({"turn": turn}),
                     },
+                    RuntimeEvent::LegacyProgress { progress } => {
+                        ApplicationEvent::LegacyToolProgress {
+                            event: progress.event,
+                            data: progress.data,
+                        }
+                    }
                     RuntimeEvent::Completed { summary } => {
                         if repository
                             .update_summary(&session_id, &summary)

@@ -130,6 +130,43 @@ pub trait OfficeTool: Send + Sync {
 /// 便利类型别名
 pub type DynTool = Arc<dyn OfficeTool>;
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct LegacyToolProgress {
+    pub event: String,
+    pub data: serde_json::Value,
+}
+
+#[derive(Clone)]
+pub struct LegacyToolProgressAdapter {
+    sender: tokio::sync::mpsc::Sender<LegacyToolProgress>,
+}
+
+impl LegacyToolProgressAdapter {
+    pub fn bounded(capacity: usize) -> (Self, tokio::sync::mpsc::Receiver<LegacyToolProgress>) {
+        let (sender, receiver) = tokio::sync::mpsc::channel(capacity.max(1));
+        (Self { sender }, receiver)
+    }
+
+    pub fn callback(&self) -> impl Fn(&str, serde_json::Value) + Send + Sync + 'static {
+        let sender = self.sender.clone();
+        move |event, data| {
+            let progress = LegacyToolProgress {
+                event: event.to_owned(),
+                data,
+            };
+            match sender.try_send(progress) {
+                Ok(()) | Err(tokio::sync::mpsc::error::TrySendError::Closed(_)) => {}
+                Err(tokio::sync::mpsc::error::TrySendError::Full(progress)) => {
+                    let sender = sender.clone();
+                    tokio::spawn(async move {
+                        let _ = sender.send(progress).await;
+                    });
+                }
+            }
+        }
+    }
+}
+
 /// Typed, backpressured progress channel for migrated tools.
 #[derive(Clone)]
 pub struct ToolProgressSink {

@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 
+use crate::agent::tool::LegacyToolProgress;
 use crate::contracts::agent_run::RuntimeArtifact;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -30,6 +31,9 @@ pub enum RuntimeEvent {
     },
     TurnFinished {
         turn: usize,
+    },
+    LegacyProgress {
+        progress: LegacyToolProgress,
     },
     Completed {
         summary: String,

@@ -26,6 +26,10 @@ pub enum ApplicationEvent {
     Message {
         content: String,
     },
+    LegacyToolProgress {
+        event: String,
+        data: serde_json::Value,
+    },
     Completed {
         summary: String,
     },
