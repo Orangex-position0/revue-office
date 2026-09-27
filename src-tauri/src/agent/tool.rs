@@ -4,7 +4,9 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
-use crate::models::{Artifact, ChatAttachment};
+use crate::contracts::presentation::PresentationProgress;
+use crate::models::ChatAttachment;
+use crate::ports::presentation_progress::{PresentationProgressError, PresentationProgressSink};
 
 /// 工具执行上下文
 #[derive(Clone)]
@@ -217,6 +219,53 @@ impl ToolProgressSink {
                 result,
             })
             .await
+    }
+}
+
+pub struct PresentationToolProgressAdapter {
+    emit: Arc<dyn Fn(&str, serde_json::Value) + Send + Sync>,
+}
+
+impl PresentationToolProgressAdapter {
+    pub fn new(emit: Arc<dyn Fn(&str, serde_json::Value) + Send + Sync>) -> Self {
+        Self { emit }
+    }
+}
+
+#[async_trait]
+impl PresentationProgressSink for PresentationToolProgressAdapter {
+    async fn emit(&self, progress: PresentationProgress) -> Result<(), PresentationProgressError> {
+        match progress {
+            PresentationProgress::Planning => (self.emit)(
+                "state_update",
+                serde_json::json!({
+                    "phase": "running",
+                    "step": "规划 PPT 大纲",
+                    "detail": "正在规划演示文稿结构...",
+                    "at": chrono::Utc::now().to_rfc3339(),
+                }),
+            ),
+            PresentationProgress::ProjectCreated { project } => (self.emit)(
+                "project_update",
+                serde_json::to_value(project).unwrap_or_else(|_| serde_json::json!({})),
+            ),
+            PresentationProgress::SlideGenerated {
+                project,
+                current_index,
+                total_slides,
+            } => {
+                let mut value =
+                    serde_json::to_value(project).unwrap_or_else(|_| serde_json::json!({}));
+                if let Some(object) = value.as_object_mut() {
+                    object.insert("current_index".into(), current_index.into());
+                    object.insert("total_slides".into(), total_slides.into());
+                    object.insert("slide_count".into(), (current_index + 1).into());
+                }
+                (self.emit)("slide_update", value);
+            }
+            PresentationProgress::Completed { .. } => {}
+        }
+        Ok(())
     }
 }
 

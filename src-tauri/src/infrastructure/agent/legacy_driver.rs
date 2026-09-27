@@ -4,11 +4,21 @@ use crate::agent::event::RuntimeEvent;
 use crate::agent::runtime::{RuntimeCancellation, RuntimeDriver, RuntimeError, RuntimeEventSink};
 use crate::agent::tool::{LegacyToolProgressAdapter, ToolContext};
 use crate::agent::{run_agent_loop, AgentConfig, AgentEvent};
+use crate::application::artifact_service::ArtifactService;
 use crate::contracts::agent_run::{RuntimeArtifact, RuntimeCompletion, RuntimeRequest};
+use crate::contracts::artifact::ArtifactDraft;
 use crate::models::ChatMessage;
 
 /// Compatibility driver that keeps the existing ReAct loop behind the new runtime boundary.
-pub struct LegacyAgentRuntimeDriver;
+pub struct LegacyAgentRuntimeDriver {
+    artifact_service: std::sync::Arc<ArtifactService>,
+}
+
+impl LegacyAgentRuntimeDriver {
+    pub fn new(artifact_service: std::sync::Arc<ArtifactService>) -> Self {
+        Self { artifact_service }
+    }
+}
 
 #[async_trait]
 impl RuntimeDriver for LegacyAgentRuntimeDriver {
@@ -18,6 +28,8 @@ impl RuntimeDriver for LegacyAgentRuntimeDriver {
         events: RuntimeEventSink,
         mut cancellation: RuntimeCancellation,
     ) -> Result<RuntimeCompletion, RuntimeError> {
+        let session_id = request.session_id.clone();
+        let owner_id = request.user_id.clone();
         let history = request
             .history
             .into_iter()
@@ -106,12 +118,27 @@ impl RuntimeDriver for LegacyAgentRuntimeDriver {
                         .await?;
                 }
                 Some(AgentEvent::Artifact { artifact }) => {
+                    let bytes = serde_json::to_vec_pretty(&artifact.content)
+                        .map_err(|error| RuntimeError::Tool(error.to_string()))?;
+                    let publication = self
+                        .artifact_service
+                        .publish(ArtifactDraft {
+                            session_id: session_id.clone(),
+                            owner_id: owner_id.clone(),
+                            kind: artifact.kind.clone(),
+                            title: artifact.title.clone(),
+                            extension: "json".into(),
+                            content: artifact.content,
+                            bytes,
+                        })
+                        .await
+                        .map_err(|error| RuntimeError::Tool(error.to_string()))?;
                     events
                         .emit(RuntimeEvent::ArtifactProduced {
                             artifact: RuntimeArtifact {
-                                kind: artifact.kind,
-                                title: artifact.title,
-                                content: artifact.content,
+                                kind: publication.kind,
+                                title: publication.title,
+                                content: publication.content,
                             },
                         })
                         .await?;

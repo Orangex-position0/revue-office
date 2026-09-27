@@ -34,11 +34,14 @@ async fn start_axum_server() -> anyhow::Result<()> {
     cfg.ensure_dirs()?;
 
     let pool = state::init_db_pool().await;
-    let services =
-        app::bootstrap::build_application_services(&cfg.database_url, cfg.db_max_connections)
-            .await?;
+    let services = app::bootstrap::build_application_services(
+        &cfg.database_url,
+        cfg.db_max_connections,
+        std::path::Path::new(&cfg.data_dir).join("artifacts"),
+    )
+    .await?;
     state::set_db_pool(pool);
-    app::state::set_services(services.session, services.chat)?;
+    app::state::set_services(services.session, services.chat, services.artifact)?;
 
     agent::tools::register_all_tools().await;
 
