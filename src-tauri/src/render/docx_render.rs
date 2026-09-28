@@ -5,7 +5,11 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DocSection {
     pub heading: String,
-    #[serde(default = "default_level", rename = "headingLevel", alias = "heading_level")]
+    #[serde(
+        default = "default_level",
+        rename = "headingLevel",
+        alias = "heading_level"
+    )]
     pub heading_level: u32,
     #[serde(default)]
     pub paragraphs: Vec<String>,

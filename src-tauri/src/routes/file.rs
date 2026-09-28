@@ -166,7 +166,8 @@ async fn upload_file(
                 "text_chars": extracted.text.chars().count(),
                 "extracted_text": extracted.text,
             })),
-        ).await?;
+        )
+        .await?;
         return Ok(Json(json!({ "ok": true, "file": file })));
     }
 
@@ -287,7 +288,10 @@ async fn stream_file(
     Response::builder()
         .status(StatusCode::OK)
         .header(header::CONTENT_TYPE, mime.as_ref())
-        .header(header::CONTENT_DISPOSITION, format!("inline; filename=\"{}\"", file.name))
+        .header(
+            header::CONTENT_DISPOSITION,
+            format!("inline; filename=\"{}\"", file.name),
+        )
         .header(header::CACHE_CONTROL, "private, max-age=3600")
         .header(header::ACCEPT_RANGES, "bytes")
         .body(Body::from(data))
@@ -358,10 +362,7 @@ async fn delete_file(
     Ok(Json(json!({ "deleted": false, "id": id })))
 }
 
-async fn get_file_thumbnail(
-    user: AuthUser,
-    Path(id): Path<String>,
-) -> Result<Response, AppError> {
+async fn get_file_thumbnail(user: AuthUser, Path(id): Path<String>) -> Result<Response, AppError> {
     let pool = crate::state::db_pool();
     let file = file_repo::get_file(&pool, &user.0.id, &id)
         .await?
@@ -386,7 +387,8 @@ async fn get_file_thumbnail(
         "file_type": file.file_type,
         "name": file.name,
         "file_size": file.file_size,
-    }).to_string();
+    })
+    .to_string();
     Response::builder()
         .status(StatusCode::OK)
         .header(header::CONTENT_TYPE, "application/json")
@@ -426,7 +428,12 @@ async fn get_file_preview(
                 .to_string()
         });
 
-    if file.file_type == "video" || matches!(extension.as_str(), "mp4" | "webm" | "avi" | "mov" | "mkv" | "flv" | "wmv" | "m4v" | "3gp" | "ogv") {
+    if file.file_type == "video"
+        || matches!(
+            extension.as_str(),
+            "mp4" | "webm" | "avi" | "mov" | "mkv" | "flv" | "wmv" | "m4v" | "3gp" | "ogv"
+        )
+    {
         return Ok(Json(json!({
             "id": file.id,
             "name": file.name,
@@ -438,7 +445,12 @@ async fn get_file_preview(
         })));
     }
 
-    if file.file_type == "image" || matches!(extension.as_str(), "png" | "jpg" | "jpeg" | "webp" | "gif" | "svg") {
+    if file.file_type == "image"
+        || matches!(
+            extension.as_str(),
+            "png" | "jpg" | "jpeg" | "webp" | "gif" | "svg"
+        )
+    {
         let data = tokio::fs::read(&path).await?;
         let b64 = base64_encode(&data);
         return Ok(Json(json!({
@@ -535,7 +547,8 @@ async fn create_folder(
     if let Some(parent_id) = payload.parent_id.as_deref() {
         ensure_folder_owner(&pool, &user.0.id, parent_id).await?;
     }
-    let folder = file_repo::create_folder(&pool, &user.0.id, &name, payload.parent_id.as_deref()).await?;
+    let folder =
+        file_repo::create_folder(&pool, &user.0.id, &name, payload.parent_id.as_deref()).await?;
     Ok(Json(json!({ "ok": true, "folder": folder })))
 }
 
@@ -544,7 +557,9 @@ async fn delete_folder(
     Path(id): Path<String>,
 ) -> Result<Json<serde_json::Value>, AppError> {
     let pool = crate::state::db_pool();
-    let existed = file_repo::get_folder(&pool, &user.0.id, &id).await?.is_some();
+    let existed = file_repo::get_folder(&pool, &user.0.id, &id)
+        .await?
+        .is_some();
     let removed_files = file_repo::delete_folder_tree(&pool, &user.0.id, &id).await?;
     for file in removed_files {
         let _ = tokio::fs::remove_file(&file.file_path).await;
@@ -635,7 +650,9 @@ fn infer_file_type(name: &str, mime_type: &str) -> String {
         "xls" | "xlsx" | "csv" | "tsv" => "excel".into(),
         "drawio" | "xml" => "drawio".into(),
         "png" | "jpg" | "jpeg" | "webp" | "gif" | "svg" => "image".into(),
-        "mp4" | "webm" | "avi" | "mov" | "mkv" | "flv" | "wmv" | "m4v" | "3gp" | "ogv" => "video".into(),
+        "mp4" | "webm" | "avi" | "mov" | "mkv" | "flv" | "wmv" | "m4v" | "3gp" | "ogv" => {
+            "video".into()
+        }
         _ if mime_type.starts_with("image/") => "image".into(),
         _ if mime_type.starts_with("video/") => "video".into(),
         _ if mime_type.contains("spreadsheet") || mime_type.contains("excel") => "excel".into(),

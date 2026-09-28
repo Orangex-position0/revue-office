@@ -437,18 +437,86 @@ impl ArtifactPublicationRepository for MySqlSessionRepository {
     ) -> Result<Option<ArtifactPublication>, ArtifactPublicationRepositoryError> {
         let content = serde_json::to_string(&finalization.content)
             .map_err(|error| ArtifactPublicationRepositoryError::InvalidData(error.to_string()))?;
+        let now = chrono::Utc::now().to_rfc3339();
+        let mut transaction = self.pool.begin().await.map_err(|error| {
+            ArtifactPublicationRepositoryError::Unavailable(anyhow::Error::new(error))
+        })?;
         let result = sqlx::query("UPDATE artifact_publications SET status = 'ready', content = ?, final_path = ?, staging_path = NULL, error = NULL, updated_at = ? WHERE id = ? AND status = 'publishing'")
             .bind(content)
             .bind(finalization.final_path)
-            .bind(chrono::Utc::now().to_rfc3339())
+            .bind(&now)
             .bind(id)
-            .execute(&self.pool)
+            .execute(&mut *transaction)
             .await
             .map_err(|error| ArtifactPublicationRepositoryError::Unavailable(anyhow::Error::new(error)))?;
         if result.rows_affected() == 0 {
+            transaction.rollback().await.map_err(|error| {
+                ArtifactPublicationRepositoryError::Unavailable(anyhow::Error::new(error))
+            })?;
             return Ok(None);
         }
-        self.find(id).await
+        let row = sqlx::query("SELECT * FROM artifact_publications WHERE id = ?")
+            .bind(id)
+            .fetch_one(&mut *transaction)
+            .await
+            .map_err(|error| {
+                ArtifactPublicationRepositoryError::Unavailable(anyhow::Error::new(error))
+            })?;
+        let publication = mysql_artifact_publication(&row)?;
+        let session_exists: i64 =
+            sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM sessions WHERE id = ?)")
+                .bind(&publication.session_id)
+                .fetch_one(&mut *transaction)
+                .await
+                .map_err(|error| {
+                    ArtifactPublicationRepositoryError::Unavailable(anyhow::Error::new(error))
+                })?;
+        if session_exists != 0 {
+            let payload: Option<String> = sqlx::query_scalar(
+                "SELECT payload FROM session_artifacts WHERE session_id = ? FOR UPDATE",
+            )
+            .bind(&publication.session_id)
+            .fetch_optional(&mut *transaction)
+            .await
+            .map_err(|error| {
+                ArtifactPublicationRepositoryError::Unavailable(anyhow::Error::new(error))
+            })?;
+            let mut artifacts: Vec<ConversationArtifact> = payload
+                .map(|payload| serde_json::from_str(&payload))
+                .transpose()
+                .map_err(|error| {
+                    ArtifactPublicationRepositoryError::InvalidData(error.to_string())
+                })?
+                .unwrap_or_default();
+            artifacts.retain(|artifact| artifact.id != publication.id);
+            artifacts.push(ConversationArtifact {
+                id: publication.id.clone(),
+                kind: publication.kind.clone(),
+                tool_kind: publication.kind.clone(),
+                title: publication.title.clone(),
+                status: publication.status.as_str().into(),
+                content: publication.content.clone(),
+                version: publication.version,
+                created_at: publication.created_at.clone(),
+                updated_at: publication.updated_at.clone(),
+            });
+            let payload = serde_json::to_string(&artifacts).map_err(|error| {
+                ArtifactPublicationRepositoryError::InvalidData(error.to_string())
+            })?;
+            sqlx::query("INSERT INTO session_artifacts (id, session_id, payload, created_at, updated_at) VALUES (?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE payload = VALUES(payload), updated_at = VALUES(updated_at)")
+                .bind(uuid::Uuid::new_v4().to_string())
+                .bind(&publication.session_id)
+                .bind(payload)
+                .bind(&now)
+                .bind(&now)
+                .execute(&mut *transaction)
+                .await
+                .map_err(|error| ArtifactPublicationRepositoryError::Unavailable(anyhow::Error::new(error)))?;
+        }
+        transaction.commit().await.map_err(|error| {
+            ArtifactPublicationRepositoryError::Unavailable(anyhow::Error::new(error))
+        })?;
+        Ok(Some(publication))
     }
 
     async fn fail(

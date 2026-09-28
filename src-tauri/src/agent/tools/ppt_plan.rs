@@ -3,13 +3,19 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use serde_json::json;
 
-use crate::agent::tool::{OfficeTool, PresentationToolProgressAdapter, ToolContext, ToolResult};
+use crate::agent::tool::{OfficeTool, ToolContext, ToolResult};
 use crate::capabilities::presentation::PresentationCapability;
 use crate::contracts::presentation::PresentationPlanRequest;
-use crate::infrastructure::llm::presentation::ConfiguredPresentationLlm;
-use crate::infrastructure::presentation_store::local::LocalPresentationStore;
 
-pub struct PptPlanTool;
+pub struct PptPlanTool {
+    capability: Arc<PresentationCapability>,
+}
+
+impl PptPlanTool {
+    pub fn new(capability: Arc<PresentationCapability>) -> Self {
+        Self { capability }
+    }
+}
 
 #[async_trait]
 impl OfficeTool for PptPlanTool {
@@ -49,14 +55,14 @@ impl OfficeTool for PptPlanTool {
         if topic.is_empty() {
             return ToolResult::err("topic 不能为空");
         }
-        let capability = PresentationCapability::new(
-            Arc::new(ConfiguredPresentationLlm::new(&ctx.user_id)),
-            Arc::new(LocalPresentationStore),
-        );
-        let progress = PresentationToolProgressAdapter::new(ctx.emit.clone());
-        match capability
+        let Some(progress) = ctx.presentation_progress() else {
+            return ToolResult::err("PPT 类型化进度通道不可用");
+        };
+        match self
+            .capability
             .plan(
                 PresentationPlanRequest {
+                    owner_id: ctx.user_id.clone(),
                     topic: topic.into(),
                     audience: input
                         .get("audience")
@@ -64,7 +70,7 @@ impl OfficeTool for PptPlanTool {
                         .map(str::to_owned),
                     preferred_model: ctx.preferred_model.clone(),
                 },
-                &progress,
+                progress.as_ref(),
             )
             .await
         {

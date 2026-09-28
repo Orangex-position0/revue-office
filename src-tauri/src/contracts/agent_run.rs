@@ -36,7 +36,9 @@ pub struct RuntimeRequest {
 pub struct RuntimeArtifact {
     pub kind: String,
     pub title: String,
+    pub extension: String,
     pub content: serde_json::Value,
+    pub bytes: Vec<u8>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

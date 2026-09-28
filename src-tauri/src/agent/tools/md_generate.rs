@@ -219,6 +219,8 @@ impl OfficeTool for MarkdownGenerateTool {
                     "style": style,
                     "summary": output.summary,
                 }),
+                extension: "md".into(),
+                bytes: vec![],
             }],
         )
     }

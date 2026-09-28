@@ -1,3 +1,4 @@
+use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
 use tracing::{info, warn};
@@ -6,8 +7,10 @@ use uuid::Uuid;
 use super::context::{compact_context, DEFAULT_CONTEXT_CONFIG};
 use super::registry::REGISTRY;
 use super::tool::{ToolContext, ToolResult};
+use crate::contracts::presentation::PresentationProgress;
 use crate::llm::FunctionDef;
 use crate::models::{Artifact, ChatMessage};
+use crate::ports::presentation_progress::{PresentationProgressError, PresentationProgressSink};
 
 // NOTE: direct_media_tool / clean_direct_topic / direct_media_input 已移除。
 // 原实现会在 allowed_tools 只有一个工具时跳过 LLM 推理直接调用工具，
@@ -31,8 +34,11 @@ pub enum AgentEvent {
         result: serde_json::Value,
         error: Option<String>,
     },
+    PresentationProgress {
+        progress: PresentationProgress,
+    },
     Artifact {
-        artifact: Artifact,
+        artifact: super::tool::ToolArtifact,
     },
     Message {
         content: String,
@@ -154,6 +160,20 @@ const OFFICE_AGENT_PROMPT: &str = r#"你是一个智能办公 Agent，可以帮�
   - 图片结果：要有可直接预览的图像链接，同时保留风格化提示词，方便继续优化
   - 视频结果：要有可直接预览的视频链接，并说明视频时长、尺寸和适用场景"#;
 
+struct AgentPresentationProgressSink {
+    sender: mpsc::Sender<AgentEvent>,
+}
+
+#[async_trait]
+impl PresentationProgressSink for AgentPresentationProgressSink {
+    async fn emit(&self, progress: PresentationProgress) -> Result<(), PresentationProgressError> {
+        self.sender
+            .send(AgentEvent::PresentationProgress { progress })
+            .await
+            .map_err(|_| PresentationProgressError)
+    }
+}
+
 /// 运行 Agent 循环，通过 channel 推送事件
 pub async fn run_agent_loop(
     history: Vec<ChatMessage>,
@@ -161,9 +181,12 @@ pub async fn run_agent_loop(
     user_attachments: Vec<crate::models::ChatAttachment>,
     ctx: ToolContext,
     config: AgentConfig,
-    client: std::sync::Arc<crate::llm::LlmClient>,
+    client: std::sync::Arc<dyn crate::ports::agent_llm::AgentLlm>,
 ) -> mpsc::Receiver<AgentEvent> {
     let (tx, rx) = mpsc::channel(256);
+    let ctx = ctx.with_presentation_progress(std::sync::Arc::new(AgentPresentationProgressSink {
+        sender: tx.clone(),
+    }));
 
     let client = client.clone();
     tokio::spawn(async move {
@@ -190,14 +213,13 @@ pub async fn run_agent_loop(
         };
         // 有图片附件时，LLM 可以直接结合视觉输入回答，不需要额外工具
         // 但仍保留工具定义，让 LLM 决定是否调用
-        if user_attachments.iter().any(|item| item.kind == "image")
-            && allowed_tool_names.is_none()
+        if user_attachments.iter().any(|item| item.kind == "image") && allowed_tool_names.is_none()
         {
             function_defs.clear();
         }
 
         // 上下文压缩
-        let compacted = compact_context(history, &DEFAULT_CONTEXT_CONFIG, &client).await;
+        let compacted = compact_context(history, &DEFAULT_CONTEXT_CONFIG, client.as_ref()).await;
 
         // 组装消息
         let mut conversation: Vec<ChatMessage> = vec![ChatMessage {
@@ -390,8 +412,12 @@ pub async fn run_agent_loop(
                                 created_at: chrono::Utc::now().to_rfc3339(),
                                 updated_at: chrono::Utc::now().to_rfc3339(),
                             };
-                            all_artifacts.push(artifact.clone());
-                            let _ = tx.send(AgentEvent::Artifact { artifact }).await;
+                            all_artifacts.push(artifact);
+                            let _ = tx
+                                .send(AgentEvent::Artifact {
+                                    artifact: art.clone(),
+                                })
+                                .await;
                         }
                     }
                 }

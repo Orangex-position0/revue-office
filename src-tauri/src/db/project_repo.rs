@@ -27,7 +27,7 @@ pub async fn create(
     let now = chrono::Utc::now().to_rfc3339();
     sqlx::query(
         "INSERT INTO projects (id, title, tool_kind, owner_id, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?)"
+         VALUES (?, ?, ?, ?, ?, ?)",
     )
     .bind(&id)
     .bind(title)
@@ -63,7 +63,7 @@ pub async fn list_by_owner(
             "SELECT id, title, description, tool_kind, owner_id, created_at, updated_at
              FROM projects
              WHERE owner_id = ? AND (title LIKE ? OR COALESCE(description, '') LIKE ?)
-             ORDER BY updated_at DESC"
+             ORDER BY updated_at DESC",
         )
         .bind(owner_id)
         .bind(qv)
@@ -73,7 +73,7 @@ pub async fn list_by_owner(
     } else {
         sqlx::query(
             "SELECT id, title, description, tool_kind, owner_id, created_at, updated_at
-             FROM projects WHERE owner_id = ? ORDER BY updated_at DESC"
+             FROM projects WHERE owner_id = ? ORDER BY updated_at DESC",
         )
         .bind(owner_id)
         .fetch_all(pool)
@@ -98,7 +98,7 @@ pub async fn list_by_owner(
 pub async fn find_by_id(pool: &DbPool, id: &str, owner_id: &str) -> AppResult<Option<ProjectRow>> {
     let row = sqlx::query(
         "SELECT id, title, description, tool_kind, owner_id, created_at, updated_at
-         FROM projects WHERE id = ? AND owner_id = ?"
+         FROM projects WHERE id = ? AND owner_id = ?",
     )
     .bind(id)
     .bind(owner_id)
@@ -142,7 +142,7 @@ pub async fn update(
     sqlx::query(
         "UPDATE projects
          SET title = ?, description = ?, tool_kind = ?, updated_at = ?
-         WHERE id = ? AND owner_id = ?"
+         WHERE id = ? AND owner_id = ?",
     )
     .bind(next_title)
     .bind(&next_description)
@@ -165,13 +165,11 @@ pub async fn update(
 }
 
 pub async fn delete(pool: &DbPool, id: &str, owner_id: &str) -> AppResult<bool> {
-    let result = sqlx::query(
-        "DELETE FROM projects WHERE id = ? AND owner_id = ?"
-    )
-    .bind(id)
-    .bind(owner_id)
-    .execute(pool)
-    .await?;
+    let result = sqlx::query("DELETE FROM projects WHERE id = ? AND owner_id = ?")
+        .bind(id)
+        .bind(owner_id)
+        .execute(pool)
+        .await?;
     Ok(result.rows_affected() > 0)
 }
 

@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PresentationPlanRequest {
+    pub owner_id: String,
     pub topic: String,
     pub audience: Option<String>,
     pub preferred_model: Option<String>,

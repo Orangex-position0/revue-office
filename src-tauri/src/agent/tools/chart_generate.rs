@@ -131,6 +131,8 @@ impl OfficeTool for ChartGenerateTool {
                         "seriesName": output.series_name.unwrap_or_else(|| "数据".into())
                     }
                 }),
+                extension: "json".into(),
+                bytes: vec![],
             }],
         )
     }

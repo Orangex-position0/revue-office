@@ -51,23 +51,20 @@ pub async fn list(
 }
 
 pub async fn unread_count(pool: &DbPool, user_id: &str) -> AppResult<i64> {
-    let count: i64 = sqlx::query_scalar(
-        "SELECT COUNT(*) FROM notifications WHERE user_id = ? AND is_read = 0"
-    )
-    .bind(user_id)
-    .fetch_one(pool)
-    .await?;
+    let count: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM notifications WHERE user_id = ? AND is_read = 0")
+            .bind(user_id)
+            .fetch_one(pool)
+            .await?;
     Ok(count)
 }
 
 pub async fn mark_as_read(pool: &DbPool, id: &str, user_id: &str) -> AppResult<bool> {
-    let result = sqlx::query(
-        "UPDATE notifications SET is_read = 1 WHERE id = ? AND user_id = ?"
-    )
-    .bind(id)
-    .bind(user_id)
-    .execute(pool)
-    .await?;
+    let result = sqlx::query("UPDATE notifications SET is_read = 1 WHERE id = ? AND user_id = ?")
+        .bind(id)
+        .bind(user_id)
+        .execute(pool)
+        .await?;
     Ok(result.rows_affected() > 0)
 }
 
@@ -80,12 +77,10 @@ pub async fn mark_all_as_read(pool: &DbPool, user_id: &str) -> AppResult<()> {
 }
 
 pub async fn delete(pool: &DbPool, id: &str, user_id: &str) -> AppResult<bool> {
-    let result = sqlx::query(
-        "DELETE FROM notifications WHERE id = ? AND user_id = ?"
-    )
-    .bind(id)
-    .bind(user_id)
-    .execute(pool)
-    .await?;
+    let result = sqlx::query("DELETE FROM notifications WHERE id = ? AND user_id = ?")
+        .bind(id)
+        .bind(user_id)
+        .execute(pool)
+        .await?;
     Ok(result.rows_affected() > 0)
 }

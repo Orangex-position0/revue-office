@@ -152,7 +152,6 @@ fn collect_use_tree(tree: &UseTree, prefix: Vec<String>, paths: &mut BTreeSet<St
 }
 
 fn forbidden(layer: Layer) -> &'static [&'static str] {
-    const TECHNOLOGY: &[&str] = &["axum", "tauri", "sqlx"];
     match layer {
         Layer::Contract => &[
             "axum",
@@ -196,7 +195,18 @@ fn forbidden(layer: Layer) -> &'static [&'static str] {
             "crate::db",
             "crate::state",
         ],
-        Layer::Agent => TECHNOLOGY,
+        Layer::Agent => &[
+            "axum",
+            "tauri",
+            "sqlx",
+            "crate::app",
+            "crate::application",
+            "crate::infrastructure",
+            "crate::routes",
+            "crate::transport",
+            "crate::db",
+            "crate::state",
+        ],
         Layer::Application => &[
             "axum",
             "tauri",
@@ -216,7 +226,7 @@ fn forbidden(layer: Layer) -> &'static [&'static str] {
             "crate::agent::event",
             "crate::agent::runtime",
         ],
-        Layer::Infrastructure => &["crate::routes", "crate::transport"],
+        Layer::Infrastructure => &["crate::application", "crate::routes", "crate::transport"],
         Layer::App => &[],
     }
 }
@@ -368,6 +378,22 @@ fn architecture_boundaries_rule_engine_detects_alias_multiline_and_full_paths() 
     assert!(!analyze_source(Layer::Agent, "fixture.rs", agent_framework)
         .unwrap()
         .is_empty());
+
+    let agent_adapter =
+        r#"use crate::infrastructure::llm::presentation::ConfiguredPresentationLlm;"#;
+    assert!(!analyze_source(Layer::Agent, "fixture.rs", agent_adapter)
+        .unwrap()
+        .is_empty());
+
+    let infrastructure_application =
+        r#"use crate::application::artifact_service::ArtifactService;"#;
+    assert!(!analyze_source(
+        Layer::Infrastructure,
+        "fixture.rs",
+        infrastructure_application,
+    )
+    .unwrap()
+    .is_empty());
 }
 
 #[test]

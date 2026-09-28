@@ -5,17 +5,21 @@ use crate::agent::runtime::AgentRuntime;
 use crate::application::artifact_service::ArtifactService;
 use crate::application::chat_service::ChatApplicationService;
 use crate::application::session_service::SessionApplicationService;
+use crate::capabilities::presentation::PresentationCapability;
 use crate::infrastructure::agent::LegacyAgentRuntimeDriver;
 use crate::infrastructure::filesystem::artifact_storage::LocalArtifactStorage;
+use crate::infrastructure::llm::agent::ConfiguredAgentLlmProvider;
+use crate::infrastructure::llm::presentation::ConfiguredPresentationLlm;
 use crate::infrastructure::persistence::mysql::MySqlSessionRepository;
 use crate::infrastructure::persistence::sqlite::SqliteSessionRepository;
+use crate::infrastructure::presentation_export::PptxPresentationExporter;
+use crate::infrastructure::presentation_store::local::LocalPresentationStore;
 use crate::ports::repositories::artifact_publication::ArtifactPublicationRepository;
 use crate::ports::repositories::session::SessionRepository;
 
 pub struct ApplicationServices {
     pub session: Arc<SessionApplicationService>,
     pub chat: Arc<ChatApplicationService>,
-    pub artifact: Arc<ArtifactService>,
 }
 
 pub async fn build_application_services(
@@ -49,18 +53,25 @@ pub async fn build_application_services(
         );
     }
     let runtime = Arc::new(AgentRuntime::with_timeout(
-        Arc::new(LegacyAgentRuntimeDriver::new(artifact.clone())),
+        Arc::new(LegacyAgentRuntimeDriver::new(Arc::new(
+            ConfiguredAgentLlmProvider,
+        ))),
         256,
         runtime_timeout,
     ));
+    let presentation = Arc::new(PresentationCapability::new(
+        Arc::new(ConfiguredPresentationLlm),
+        Arc::new(LocalPresentationStore),
+    ));
+    crate::agent::tools::register_all_tools(presentation, Arc::new(PptxPresentationExporter)).await;
 
     Ok(ApplicationServices {
         session: Arc::new(SessionApplicationService::new(session_repository.clone())),
-        chat: Arc::new(ChatApplicationService::new(
+        chat: Arc::new(ChatApplicationService::with_artifact_service(
             session_repository,
             runtime,
+            artifact,
             256,
         )),
-        artifact,
     })
 }

@@ -187,6 +187,8 @@ XML 格式示例：
                     "diagram_type": diagram_type,
                     "xml": xml,
                 }),
+                extension: "drawio".into(),
+                bytes: vec![],
             }],
         )
     }

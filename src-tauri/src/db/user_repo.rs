@@ -4,7 +4,7 @@ use crate::models::User;
 
 pub async fn find_by_username(pool: &DbPool, username: &str) -> AppResult<Option<(User, String)>> {
     let row = sqlx::query(
-        "SELECT id, username, email, password_hash, avatar, role FROM users WHERE username = ?"
+        "SELECT id, username, email, password_hash, avatar, role FROM users WHERE username = ?",
     )
     .bind(username)
     .fetch_optional(pool)
@@ -19,7 +19,13 @@ pub async fn find_by_username(pool: &DbPool, username: &str) -> AppResult<Option
             let avatar: Option<String> = r.try_get(4)?;
             let role: String = r.try_get(5)?;
             Ok(Some((
-                User { id, username, email, avatar, role },
+                User {
+                    id,
+                    username,
+                    email,
+                    avatar,
+                    role,
+                },
                 password_hash,
             )))
         }
@@ -28,12 +34,10 @@ pub async fn find_by_username(pool: &DbPool, username: &str) -> AppResult<Option
 }
 
 pub async fn find_by_id(pool: &DbPool, id: &str) -> AppResult<Option<User>> {
-    let row = sqlx::query(
-        "SELECT id, username, email, avatar, role FROM users WHERE id = ?"
-    )
-    .bind(id)
-    .fetch_optional(pool)
-    .await?;
+    let row = sqlx::query("SELECT id, username, email, avatar, role FROM users WHERE id = ?")
+        .bind(id)
+        .fetch_optional(pool)
+        .await?;
 
     match row {
         Some(r) => {
@@ -60,7 +64,7 @@ pub async fn create(
     let now = chrono::Utc::now().to_rfc3339();
     sqlx::query(
         "INSERT INTO users (id, username, email, password_hash, role, created_at, updated_at)
-         VALUES (?, ?, ?, ?, 'user', ?, ?)"
+         VALUES (?, ?, ?, ?, 'user', ?, ?)",
     )
     .bind(&id)
     .bind(username)

@@ -42,19 +42,27 @@ pub fn application_event_frame(session_id: &str, event: ApplicationEvent) -> Sse
         },
         ApplicationEvent::ProjectUpdated { project } => SseFrame {
             event: "project_update".into(),
-            data: serde_json::json!({"project": project}),
+            data: project,
         },
         ApplicationEvent::SlideUpdated { slide } => SseFrame {
             event: "slide_update".into(),
-            data: serde_json::json!({"slide": slide}),
+            data: slide,
         },
-        ApplicationEvent::ArtifactUpdated { artifact } => SseFrame {
-            event: "artifact_update".into(),
-            data: serde_json::json!({
-                "artifact": artifact,
-                "session_id": session_id,
-            }),
-        },
+        ApplicationEvent::ArtifactUpdated {
+            artifact,
+            artifacts,
+        } => {
+            let tool_kind = artifact.kind.clone();
+            SseFrame {
+                event: "artifact_update".into(),
+                data: serde_json::json!({
+                    "artifact": artifact,
+                    "artifacts": artifacts,
+                    "session_id": session_id,
+                    "tool_kind": tool_kind,
+                }),
+            }
+        }
         ApplicationEvent::Message { content } => SseFrame {
             event: "message".into(),
             data: serde_json::json!({
@@ -63,13 +71,17 @@ pub fn application_event_frame(session_id: &str, event: ApplicationEvent) -> Sse
             }),
         },
         ApplicationEvent::LegacyToolProgress { event, data } => SseFrame { event, data },
-        ApplicationEvent::Completed { summary } => SseFrame {
+        ApplicationEvent::Completed {
+            summary,
+            artifacts,
+            new_artifacts,
+        } => SseFrame {
             event: "done".into(),
             data: serde_json::json!({
                 "session_id": session_id,
                 "summary": summary,
-                "artifacts": [],
-                "new_artifacts": [],
+                "artifacts": artifacts,
+                "new_artifacts": new_artifacts,
             }),
         },
         ApplicationEvent::Failed { code, message } => SseFrame {

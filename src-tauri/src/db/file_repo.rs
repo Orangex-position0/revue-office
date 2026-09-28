@@ -68,7 +68,11 @@ pub async fn list_files(
     Ok(files)
 }
 
-pub async fn search_files(pool: &DbPool, owner_id: &str, query: Option<&str>) -> AppResult<Vec<FileRow>> {
+pub async fn search_files(
+    pool: &DbPool,
+    owner_id: &str,
+    query: Option<&str>,
+) -> AppResult<Vec<FileRow>> {
     let pattern = format!("%{}%", query.unwrap_or("").trim());
     let rows = sqlx::query(
         "SELECT id, owner_id, name, file_path, file_type, file_size, folder_id, description, metadata, created_at, updated_at
@@ -223,23 +227,21 @@ pub async fn delete_file(pool: &DbPool, owner_id: &str, id: &str) -> AppResult<O
 }
 
 pub async fn stats(pool: &DbPool, owner_id: &str) -> AppResult<FileStats> {
-    let row = sqlx::query(
-        "SELECT COUNT(*), COALESCE(SUM(file_size), 0) FROM files WHERE owner_id = ?"
-    )
-    .bind(owner_id)
-    .fetch_one(pool)
-    .await?;
+    let row =
+        sqlx::query("SELECT COUNT(*), COALESCE(SUM(file_size), 0) FROM files WHERE owner_id = ?")
+            .bind(owner_id)
+            .fetch_one(pool)
+            .await?;
 
     let total_files: i64 = row.try_get(0)?;
     let total_size: i64 = row.try_get(1)?;
 
     let mut by_type = HashMap::new();
-    let rows = sqlx::query(
-        "SELECT file_type, COUNT(*) FROM files WHERE owner_id = ? GROUP BY file_type"
-    )
-    .bind(owner_id)
-    .fetch_all(pool)
-    .await?;
+    let rows =
+        sqlx::query("SELECT file_type, COUNT(*) FROM files WHERE owner_id = ? GROUP BY file_type")
+            .bind(owner_id)
+            .fetch_all(pool)
+            .await?;
 
     for row in rows {
         let file_type: String = row.try_get(0)?;
@@ -262,7 +264,7 @@ pub async fn list_folders(
     let rows = if let Some(parent_id) = parent_id {
         sqlx::query(
             "SELECT id, owner_id, name, parent_id, created_at, updated_at
-             FROM folders WHERE owner_id = ? AND parent_id = ? ORDER BY name ASC"
+             FROM folders WHERE owner_id = ? AND parent_id = ? ORDER BY name ASC",
         )
         .bind(owner_id)
         .bind(parent_id)
@@ -271,7 +273,7 @@ pub async fn list_folders(
     } else {
         sqlx::query(
             "SELECT id, owner_id, name, parent_id, created_at, updated_at
-             FROM folders WHERE owner_id = ? AND parent_id IS NULL ORDER BY name ASC"
+             FROM folders WHERE owner_id = ? AND parent_id IS NULL ORDER BY name ASC",
         )
         .bind(owner_id)
         .fetch_all(pool)
@@ -288,7 +290,7 @@ pub async fn list_folders(
 pub async fn get_folder(pool: &DbPool, owner_id: &str, id: &str) -> AppResult<Option<FolderRow>> {
     let row = sqlx::query(
         "SELECT id, owner_id, name, parent_id, created_at, updated_at
-         FROM folders WHERE id = ? AND owner_id = ?"
+         FROM folders WHERE id = ? AND owner_id = ?",
     )
     .bind(id)
     .bind(owner_id)
@@ -311,7 +313,7 @@ pub async fn create_folder(
     let now = chrono::Utc::now().to_rfc3339();
     sqlx::query(
         "INSERT INTO folders (id, owner_id, name, parent_id, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?)"
+         VALUES (?, ?, ?, ?, ?, ?)",
     )
     .bind(&id)
     .bind(owner_id)
@@ -332,7 +334,11 @@ pub async fn create_folder(
     })
 }
 
-pub async fn delete_folder_tree(pool: &DbPool, owner_id: &str, id: &str) -> AppResult<Vec<FileRow>> {
+pub async fn delete_folder_tree(
+    pool: &DbPool,
+    owner_id: &str,
+    id: &str,
+) -> AppResult<Vec<FileRow>> {
     if get_folder(pool, owner_id, id).await?.is_none() {
         return Ok(Vec::new());
     }
@@ -341,13 +347,11 @@ pub async fn delete_folder_tree(pool: &DbPool, owner_id: &str, id: &str) -> AppR
     let mut index = 0;
     while index < folder_ids.len() {
         let parent_id = folder_ids[index].clone();
-        let rows = sqlx::query(
-            "SELECT id FROM folders WHERE owner_id = ? AND parent_id = ?"
-        )
-        .bind(owner_id)
-        .bind(&parent_id)
-        .fetch_all(pool)
-        .await?;
+        let rows = sqlx::query("SELECT id FROM folders WHERE owner_id = ? AND parent_id = ?")
+            .bind(owner_id)
+            .bind(&parent_id)
+            .fetch_all(pool)
+            .await?;
 
         for row in rows {
             let child_id: String = row.try_get(0)?;

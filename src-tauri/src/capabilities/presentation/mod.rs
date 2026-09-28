@@ -61,6 +61,7 @@ impl PresentationCapability {
             None => {
                 self.plan(
                     PresentationPlanRequest {
+                        owner_id: request.owner_id.clone(),
                         topic: request.topic.clone(),
                         audience: None,
                         preferred_model: request.preferred_model.clone(),

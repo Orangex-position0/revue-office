@@ -3,15 +3,27 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use serde_json::json;
 
-use crate::agent::tool::{
-    OfficeTool, PresentationToolProgressAdapter, ToolArtifact, ToolContext, ToolResult,
-};
+use crate::agent::tool::{OfficeTool, ToolArtifact, ToolContext, ToolResult};
 use crate::capabilities::presentation::PresentationCapability;
 use crate::contracts::presentation::{PresentationGenerateRequest, PresentationPlan};
-use crate::infrastructure::llm::presentation::ConfiguredPresentationLlm;
-use crate::infrastructure::presentation_store::local::LocalPresentationStore;
+use crate::ports::presentation_export::PresentationExporter;
 
-pub struct PptGenerateTool;
+pub struct PptGenerateTool {
+    capability: Arc<PresentationCapability>,
+    exporter: Arc<dyn PresentationExporter>,
+}
+
+impl PptGenerateTool {
+    pub fn new(
+        capability: Arc<PresentationCapability>,
+        exporter: Arc<dyn PresentationExporter>,
+    ) -> Self {
+        Self {
+            capability,
+            exporter,
+        }
+    }
+}
 
 #[async_trait]
 impl OfficeTool for PptGenerateTool {
@@ -58,12 +70,11 @@ impl OfficeTool for PptGenerateTool {
             .get("ppt_plan")
             .cloned()
             .and_then(|value| serde_json::from_value::<PresentationPlan>(value).ok());
-        let capability = PresentationCapability::new(
-            Arc::new(ConfiguredPresentationLlm::new(&ctx.user_id)),
-            Arc::new(LocalPresentationStore),
-        );
-        let progress = PresentationToolProgressAdapter::new(ctx.emit.clone());
-        match capability
+        let Some(progress) = ctx.presentation_progress() else {
+            return ToolResult::err("PPT 类型化进度通道不可用");
+        };
+        match self
+            .capability
             .generate(
                 PresentationGenerateRequest {
                     owner_id: ctx.user_id.clone(),
@@ -73,13 +84,19 @@ impl OfficeTool for PptGenerateTool {
                     preferred_model: ctx.preferred_model.clone(),
                     plan,
                 },
-                &progress,
+                progress.as_ref(),
             )
             .await
         {
             Ok(project) => {
                 let slide_count = project.slides.len();
                 let project_title = project.title.clone();
+                let bytes = match self.exporter.export_pptx(&project).await {
+                    Ok(bytes) => bytes,
+                    Err(error) => {
+                        return ToolResult::err(format!("PPTX 导出失败: {error}"));
+                    }
+                };
                 let content = match serde_json::to_value(project) {
                     Ok(value) => value,
                     Err(error) => {
@@ -92,6 +109,8 @@ impl OfficeTool for PptGenerateTool {
                         kind: "ppt".into(),
                         title: project_title,
                         content,
+                        extension: "pptx".into(),
+                        bytes,
                     }],
                 )
             }

@@ -19,8 +19,9 @@ pub async fn extract_user(parts: &Parts) -> Result<User, AppError> {
     let claims = verify_token(token).map_err(|_| AppError::Unauthorized)?;
 
     let pool = crate::state::db_pool();
-    let user =
-        crate::db::user_repo::find_by_id(&pool, &claims.sub).await?.ok_or(AppError::Unauthorized)?;
+    let user = crate::db::user_repo::find_by_id(&pool, &claims.sub)
+        .await?
+        .ok_or(AppError::Unauthorized)?;
 
     Ok(user)
 }

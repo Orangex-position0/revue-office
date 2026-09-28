@@ -42,9 +42,7 @@ async fn start_axum_server() -> anyhow::Result<()> {
     )
     .await?;
     state::set_db_pool(pool);
-    app::state::set_services(services.session, services.chat, services.artifact)?;
-
-    agent::tools::register_all_tools().await;
+    app::state::set_services(services.session, services.chat)?;
 
     let app = routes::build_router();
     let addr: SocketAddr = format!("{}:{}", cfg.host, cfg.port).parse()?;

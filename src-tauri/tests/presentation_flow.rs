@@ -1,21 +1,24 @@
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use async_trait::async_trait;
 use revue_office_lib::agent::tool::PresentationToolProgressAdapter;
 use revue_office_lib::application::artifact_service::ArtifactService;
 use revue_office_lib::application::event::ApplicationEvent;
 use revue_office_lib::capabilities::presentation::PresentationCapability;
-use revue_office_lib::contracts::agent_run::RuntimeArtifact;
 use revue_office_lib::contracts::artifact::{ArtifactDraft, ArtifactPublicationStatus};
+use revue_office_lib::contracts::conversation::NewConversation;
 use revue_office_lib::contracts::presentation::{
-    PresentationGenerateRequest, PresentationPlan, PresentationPlanRequest, PresentationProject,
-    PresentationSlidePlan,
+    PresentationGenerateRequest, PresentationPlan, PresentationPlanRequest, PresentationProgress,
+    PresentationProject, PresentationSlidePlan,
 };
 use revue_office_lib::infrastructure::filesystem::artifact_storage::LocalArtifactStorage;
 use revue_office_lib::infrastructure::persistence::sqlite::SqliteSessionRepository;
+use revue_office_lib::infrastructure::presentation_export::PptxPresentationExporter;
 use revue_office_lib::ports::llm::{PresentationLlm, PresentationLlmError};
+use revue_office_lib::ports::presentation_export::PresentationExporter;
 use revue_office_lib::ports::presentation_store::{PresentationStore, PresentationStoreError};
 use revue_office_lib::ports::repositories::artifact_publication::ArtifactPublicationRepository;
+use revue_office_lib::ports::repositories::session::SessionRepository;
 use revue_office_lib::transport::sse::application_event_frame;
 use tokio::sync::Mutex as AsyncMutex;
 
@@ -77,11 +80,8 @@ async fn presentation_flow_emits_compatible_progress_and_publishes_before_done()
     let root =
         std::env::temp_dir().join(format!("revue-presentation-flow-{}", uuid::Uuid::new_v4()));
     std::fs::create_dir_all(&root).unwrap();
-    let events = Arc::new(Mutex::new(Vec::<(String, serde_json::Value)>::new()));
-    let event_log = events.clone();
-    let progress = PresentationToolProgressAdapter::new(Arc::new(move |name, data| {
-        event_log.lock().unwrap().push((name.into(), data));
-    }));
+    let (progress_sender, mut progress_events) = tokio::sync::mpsc::channel(8);
+    let progress = PresentationToolProgressAdapter::new(progress_sender);
     let store = Arc::new(FakeStore::default());
     let capability = PresentationCapability::new(Arc::new(FakeLlm), store.clone());
     let project = capability
@@ -105,47 +105,83 @@ async fn presentation_flow_emits_compatible_progress_and_publishes_before_done()
             .await
             .unwrap(),
     );
+    let fixture_pool = sqlx::SqlitePool::connect(&database_url).await.unwrap();
+    sqlx::query("INSERT INTO users (id, username, password_hash, created_at, updated_at) VALUES (?, ?, ?, ?, ?)")
+        .bind("owner-1")
+        .bind(format!("owner-{}", uuid::Uuid::new_v4()))
+        .bind("not-a-real-hash")
+        .bind("2026-09-26T00:00:00Z")
+        .bind("2026-09-26T00:00:00Z")
+        .execute(&fixture_pool)
+        .await
+        .unwrap();
+    fixture_pool.close().await;
+    let session = repository
+        .create(NewConversation {
+            owner_id: "owner-1".into(),
+            project_id: None,
+            tool_kind: Some("presentation".into()),
+            title: project.title.clone(),
+        })
+        .await
+        .unwrap();
     let artifact_service = ArtifactService::new(
         repository.clone(),
         Arc::new(LocalArtifactStorage::new(root.join("artifacts"))),
     );
     let content = serde_json::to_value(&project).unwrap();
+    let pptx = PptxPresentationExporter
+        .export_pptx(&project)
+        .await
+        .unwrap();
+    assert!(pptx.starts_with(b"PK"));
     let publication = artifact_service
         .publish(ArtifactDraft {
-            session_id: "session-1".into(),
+            session_id: session.id.clone(),
             owner_id: "owner-1".into(),
             kind: "ppt".into(),
             title: project.title.clone(),
-            extension: "json".into(),
-            bytes: serde_json::to_vec_pretty(&content).unwrap(),
+            extension: "pptx".into(),
+            bytes: pptx,
             content,
         })
         .await
         .unwrap();
     assert_eq!(publication.status, ArtifactPublicationStatus::Ready);
 
-    let mut event_names = events
-        .lock()
-        .unwrap()
-        .iter()
-        .map(|(name, _)| name.clone())
-        .collect::<Vec<_>>();
+    drop(progress);
+    let mut event_names = Vec::new();
+    while let Some(progress) = progress_events.recv().await {
+        let event = match progress {
+            PresentationProgress::Planning => ApplicationEvent::StateChanged {
+                state: "planning_presentation".into(),
+                detail: serde_json::json!({}),
+            },
+            PresentationProgress::ProjectCreated { project } => ApplicationEvent::ProjectUpdated {
+                project: serde_json::to_value(project).unwrap(),
+            },
+            PresentationProgress::SlideGenerated { project, .. } => {
+                ApplicationEvent::SlideUpdated {
+                    slide: serde_json::to_value(project).unwrap(),
+                }
+            }
+            PresentationProgress::Completed { .. } => continue,
+        };
+        event_names.push(application_event_frame(&session.id, event).event);
+    }
     event_names.push(
         application_event_frame(
-            "session-1",
+            &session.id,
             ApplicationEvent::ArtifactUpdated {
-                artifact: RuntimeArtifact {
-                    kind: publication.kind.clone(),
-                    title: publication.title.clone(),
-                    content: publication.content.clone(),
-                },
+                artifact: publication.clone(),
+                artifacts: vec![publication.clone()],
             },
         )
         .event,
     );
     event_names.push(
         application_event_frame(
-            "session-1",
+            &session.id,
             ApplicationEvent::Message {
                 content: "Presentation ready".into(),
             },
@@ -154,9 +190,11 @@ async fn presentation_flow_emits_compatible_progress_and_publishes_before_done()
     );
     event_names.push(
         application_event_frame(
-            "session-1",
+            &session.id,
             ApplicationEvent::Completed {
                 summary: "complete".into(),
+                artifacts: vec![publication.clone()],
+                new_artifacts: vec![publication.clone()],
             },
         )
         .event,
@@ -194,6 +232,13 @@ async fn presentation_flow_emits_compatible_progress_and_publishes_before_done()
             .unwrap()
             .status,
         ArtifactPublicationStatus::Ready
+    );
+    let recovered = reopened.legacy_artifacts(&session.id).await.unwrap();
+    assert_eq!(recovered.len(), 1);
+    assert_eq!(recovered[0].id, publication.id);
+    assert_eq!(
+        recovered[0].content["file_path"],
+        publication.final_path.clone().unwrap()
     );
     drop(reopened);
     let _ = std::fs::remove_dir_all(root);

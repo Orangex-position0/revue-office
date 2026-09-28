@@ -1,5 +1,5 @@
-use crate::llm::LlmClient;
 use crate::models::ChatMessage;
+use crate::ports::agent_llm::AgentLlm;
 
 #[derive(Clone)]
 pub struct ContextConfig {
@@ -56,7 +56,7 @@ pub fn micro_compact(messages: &[ChatMessage], config: &ContextConfig) -> Vec<Ch
 pub async fn summary_compact(
     messages: Vec<ChatMessage>,
     config: &ContextConfig,
-    client: &LlmClient,
+    client: &dyn AgentLlm,
 ) -> Vec<ChatMessage> {
     if messages.len() <= config.message_threshold {
         return messages;
@@ -133,7 +133,7 @@ pub async fn summary_compact(
 pub async fn compact_context(
     messages: Vec<ChatMessage>,
     config: &ContextConfig,
-    client: &LlmClient,
+    client: &dyn AgentLlm,
 ) -> Vec<ChatMessage> {
     let micro = micro_compact(&messages, config);
     summary_compact(micro, config, client).await

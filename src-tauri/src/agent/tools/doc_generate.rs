@@ -11,7 +11,11 @@ pub struct DocGenerateTool;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct DocSection {
     heading: String,
-    #[serde(default = "default_heading_level", rename = "headingLevel", alias = "heading_level")]
+    #[serde(
+        default = "default_heading_level",
+        rename = "headingLevel",
+        alias = "heading_level"
+    )]
     heading_level: u32,
     #[serde(default)]
     paragraphs: Vec<String>,
@@ -259,6 +263,8 @@ impl OfficeTool for DocGenerateTool {
                             "format": format,
                             "generated_by": "fallback",
                         }),
+                        extension: "json".into(),
+                        bytes: vec![],
                     }],
                 );
             }
@@ -284,6 +290,8 @@ impl OfficeTool for DocGenerateTool {
                     "format": format,
                     "generated_by": "llm",
                 }),
+                extension: "json".into(),
+                bytes: vec![],
             }],
         )
     }

@@ -1,6 +1,24 @@
 use revue_office_lib::application::event::ApplicationEvent;
-use revue_office_lib::contracts::agent_run::RuntimeArtifact;
+use revue_office_lib::contracts::artifact::{ArtifactPublication, ArtifactPublicationStatus};
 use revue_office_lib::transport::sse::application_event_frame;
+
+fn ready_artifact() -> ArtifactPublication {
+    ArtifactPublication {
+        id: "artifact-1".into(),
+        session_id: "session-1".into(),
+        owner_id: "owner-1".into(),
+        kind: "document".into(),
+        title: "Draft".into(),
+        status: ArtifactPublicationStatus::Ready,
+        content: serde_json::json!({"markdown": "# Draft", "file_path": "outputs/draft.json"}),
+        staging_path: None,
+        final_path: Some("outputs/draft.json".into()),
+        error: None,
+        version: 1,
+        created_at: "2026-09-26T00:00:00Z".into(),
+        updated_at: "2026-09-26T00:00:00Z".into(),
+    }
+}
 
 #[test]
 fn chat_stream_contract_preserves_public_event_names_and_key_fields() {
@@ -27,22 +45,19 @@ fn chat_stream_contract_preserves_public_event_names_and_key_fields() {
                 project: serde_json::json!({"id": "project-1"}),
             },
             "project_update",
-            "project",
+            "id",
         ),
         (
             ApplicationEvent::SlideUpdated {
                 slide: serde_json::json!({"id": "slide-1"}),
             },
             "slide_update",
-            "slide",
+            "id",
         ),
         (
             ApplicationEvent::ArtifactUpdated {
-                artifact: RuntimeArtifact {
-                    kind: "document".into(),
-                    title: "Draft".into(),
-                    content: serde_json::json!({"markdown": "# Draft"}),
-                },
+                artifact: ready_artifact(),
+                artifacts: vec![ready_artifact()],
             },
             "artifact_update",
             "artifact",
@@ -57,6 +72,8 @@ fn chat_stream_contract_preserves_public_event_names_and_key_fields() {
         (
             ApplicationEvent::Completed {
                 summary: "finished".into(),
+                artifacts: vec![ready_artifact()],
+                new_artifacts: vec![ready_artifact()],
             },
             "done",
             "summary",

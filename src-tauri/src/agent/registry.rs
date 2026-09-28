@@ -1,8 +1,7 @@
 use std::collections::HashMap;
-use std::sync::Arc;
 use tokio::sync::RwLock;
 
-use super::tool::{DynTool, OfficeTool};
+use super::tool::DynTool;
 use crate::llm::FunctionDef;
 use crate::llm::FunctionSpec;
 

@@ -1,5 +1,4 @@
 pub mod auth;
-pub mod chat;
 pub mod dashboard;
 pub mod doc_export;
 pub mod embed;
@@ -7,7 +6,6 @@ pub mod file;
 pub mod health;
 pub mod notification;
 pub mod project;
-pub mod session;
 pub mod settings;
 
 use axum::Router;
@@ -22,8 +20,8 @@ pub fn build_router() -> Router {
 
     Router::new()
         .merge(auth::router())
-        .merge(chat::router())
-        .merge(session::router())
+        .merge(crate::transport::chat::router())
+        .merge(crate::transport::session::router())
         .merge(project::router())
         .merge(notification::router())
         .merge(settings::router())

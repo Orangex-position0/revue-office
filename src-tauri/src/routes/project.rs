@@ -77,7 +77,8 @@ async fn create_project(
         &req.title,
         req.tool_kind.as_deref().unwrap_or("general"),
         &user.0.id,
-    ).await?;
+    )
+    .await?;
     if req.description.is_some() {
         let updated = project_repo::update(
             &pool,
@@ -86,7 +87,8 @@ async fn create_project(
             None,
             Some(req.description.as_deref()),
             None,
-        ).await?;
+        )
+        .await?;
         return Ok(Json(json!(updated.unwrap_or(project))));
     }
     Ok(Json(json!(project)))
@@ -126,7 +128,8 @@ async fn update_project(
         req.title.as_deref(),
         Some(req.description.as_deref()),
         req.tool_kind.as_deref(),
-    ).await?
+    )
+    .await?
     .ok_or(AppError::NotFound("项目不存在".into()))?;
     Ok(Json(json!(project)))
 }
@@ -148,7 +151,8 @@ async fn get_project_sessions(
     let project = project_repo::find_by_id(&pool, &project_id, &user.0.id)
         .await?
         .ok_or(AppError::NotFound("项目不存在".into()))?;
-    let sessions = session_repo::list_by_owner(&pool, &user.0.id, 100, None).await?
+    let sessions = session_repo::list_by_owner(&pool, &user.0.id, 100, None)
+        .await?
         .into_iter()
         .filter(|item| item.project_id.as_deref() == Some(project.id.as_str()))
         .collect::<Vec<_>>();

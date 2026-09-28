@@ -5,17 +5,7 @@ use crate::llm::LlmClient;
 use crate::models::ChatMessage;
 use crate::ports::llm::{PresentationLlm, PresentationLlmError};
 
-pub struct ConfiguredPresentationLlm {
-    user_id: String,
-}
-
-impl ConfiguredPresentationLlm {
-    pub fn new(user_id: impl Into<String>) -> Self {
-        Self {
-            user_id: user_id.into(),
-        }
-    }
-}
+pub struct ConfiguredPresentationLlm;
 
 #[async_trait]
 impl PresentationLlm for ConfiguredPresentationLlm {
@@ -50,7 +40,8 @@ impl PresentationLlm for ConfiguredPresentationLlm {
                 tool_call_id: None,
             },
         ];
-        let client = LlmClient::for_user(&self.user_id, request.preferred_model.as_deref()).await;
+        let client =
+            LlmClient::for_user(&request.owner_id, request.preferred_model.as_deref()).await;
         let response = client
             .chat(&messages, None)
             .await

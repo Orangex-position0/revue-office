@@ -5,12 +5,15 @@ use std::task::{Context, Poll};
 use futures::Stream;
 use tokio::sync::mpsc;
 
+use super::artifact_service::ArtifactService;
 use super::error::ChatApplicationError;
 use super::event::ApplicationEvent;
 use crate::agent::event::RuntimeEvent;
 use crate::agent::runtime::{AgentRuntime, RuntimeCancellationHandle};
 use crate::contracts::agent_run::{RuntimeAttachment, RuntimeMessage, RuntimeRequest};
+use crate::contracts::artifact::ArtifactDraft;
 use crate::contracts::conversation::{ConversationMessage, NewConversation};
+use crate::contracts::presentation::PresentationProgress;
 use crate::ports::repositories::session::SessionRepository;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -67,6 +70,7 @@ impl ChatRunHandle {
 pub struct ChatApplicationService {
     repository: Arc<dyn SessionRepository>,
     runtime: Arc<AgentRuntime>,
+    artifact_service: Option<Arc<ArtifactService>>,
     event_capacity: usize,
 }
 
@@ -79,6 +83,21 @@ impl ChatApplicationService {
         Self {
             repository,
             runtime,
+            artifact_service: None,
+            event_capacity: event_capacity.max(1),
+        }
+    }
+
+    pub fn with_artifact_service(
+        repository: Arc<dyn SessionRepository>,
+        runtime: Arc<AgentRuntime>,
+        artifact_service: Arc<ArtifactService>,
+        event_capacity: usize,
+    ) -> Self {
+        Self {
+            repository,
+            runtime,
+            artifact_service: Some(artifact_service),
             event_capacity: event_capacity.max(1),
         }
     }
@@ -149,11 +168,14 @@ impl ChatApplicationService {
         let cancellation = runtime_handle.cancellation.clone();
         let mut runtime_events = runtime_handle.events;
         let repository = self.repository.clone();
+        let artifact_service = self.artifact_service.clone();
+        let owner_id = conversation.owner_id.clone();
         let session_id = conversation.id.clone();
         let (application_sender, application_events) = mpsc::channel(self.event_capacity);
         let task_cancellation = cancellation.clone();
 
         tokio::spawn(async move {
+            let mut published_artifacts = Vec::new();
             while let Some(event) = runtime_events.recv().await {
                 let application_event = match event {
                     RuntimeEvent::Thinking { content } => ApplicationEvent::StateChanged {
@@ -186,7 +208,43 @@ impl ChatApplicationService {
                         result,
                     },
                     RuntimeEvent::ArtifactProduced { artifact } => {
-                        ApplicationEvent::ArtifactUpdated { artifact }
+                        let Some(artifact_service) = artifact_service.as_ref() else {
+                            task_cancellation.cancel();
+                            let _ = application_sender
+                                .send(ApplicationEvent::Failed {
+                                    code: "artifact_service_unavailable".into(),
+                                    message: "Artifact publication is unavailable".into(),
+                                })
+                                .await;
+                            break;
+                        };
+                        match artifact_service
+                            .publish(ArtifactDraft {
+                                session_id: session_id.clone(),
+                                owner_id: owner_id.clone(),
+                                kind: artifact.kind,
+                                title: artifact.title,
+                                extension: artifact.extension,
+                                content: artifact.content,
+                                bytes: artifact.bytes,
+                            })
+                            .await
+                        {
+                            Ok(publication) => {
+                                published_artifacts.push(publication.clone());
+                                ApplicationEvent::ArtifactUpdated {
+                                    artifact: publication,
+                                    artifacts: published_artifacts.clone(),
+                                }
+                            }
+                            Err(error) => {
+                                task_cancellation.cancel();
+                                ApplicationEvent::Failed {
+                                    code: "artifact_publication_failed".into(),
+                                    message: error.to_string(),
+                                }
+                            }
+                        }
                     }
                     RuntimeEvent::MessageProduced { content } => {
                         if repository
@@ -218,6 +276,33 @@ impl ChatApplicationService {
                         state: "turn_finished".into(),
                         detail: serde_json::json!({"turn": turn}),
                     },
+                    RuntimeEvent::PresentationProgress { progress } => match progress {
+                        PresentationProgress::Planning => ApplicationEvent::StateChanged {
+                            state: "规划 PPT 大纲".into(),
+                            detail: serde_json::json!("正在规划演示文稿结构..."),
+                        },
+                        PresentationProgress::ProjectCreated { project } => {
+                            ApplicationEvent::ProjectUpdated {
+                                project: serde_json::to_value(project)
+                                    .unwrap_or_else(|_| serde_json::json!({})),
+                            }
+                        }
+                        PresentationProgress::SlideGenerated {
+                            project,
+                            current_index,
+                            total_slides,
+                        } => {
+                            let mut slide = serde_json::to_value(project)
+                                .unwrap_or_else(|_| serde_json::json!({}));
+                            if let Some(object) = slide.as_object_mut() {
+                                object.insert("current_index".into(), current_index.into());
+                                object.insert("total_slides".into(), total_slides.into());
+                                object.insert("slide_count".into(), (current_index + 1).into());
+                            }
+                            ApplicationEvent::SlideUpdated { slide }
+                        }
+                        PresentationProgress::Completed { .. } => continue,
+                    },
                     RuntimeEvent::LegacyProgress { progress } => {
                         ApplicationEvent::LegacyToolProgress {
                             event: progress.event,
@@ -235,7 +320,11 @@ impl ChatApplicationService {
                                 message: "Unable to persist the conversation summary".into(),
                             }
                         } else {
-                            ApplicationEvent::Completed { summary }
+                            ApplicationEvent::Completed {
+                                summary,
+                                artifacts: published_artifacts.clone(),
+                                new_artifacts: published_artifacts.clone(),
+                            }
                         }
                     }
                     RuntimeEvent::Failed { kind, message } => ApplicationEvent::Failed {

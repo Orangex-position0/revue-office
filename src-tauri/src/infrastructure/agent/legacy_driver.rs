@@ -4,19 +4,18 @@ use crate::agent::event::RuntimeEvent;
 use crate::agent::runtime::{RuntimeCancellation, RuntimeDriver, RuntimeError, RuntimeEventSink};
 use crate::agent::tool::{LegacyToolProgressAdapter, ToolContext};
 use crate::agent::{run_agent_loop, AgentConfig, AgentEvent};
-use crate::application::artifact_service::ArtifactService;
 use crate::contracts::agent_run::{RuntimeArtifact, RuntimeCompletion, RuntimeRequest};
-use crate::contracts::artifact::ArtifactDraft;
 use crate::models::ChatMessage;
+use crate::ports::agent_llm::AgentLlmProvider;
 
 /// Compatibility driver that keeps the existing ReAct loop behind the new runtime boundary.
 pub struct LegacyAgentRuntimeDriver {
-    artifact_service: std::sync::Arc<ArtifactService>,
+    llm_provider: std::sync::Arc<dyn AgentLlmProvider>,
 }
 
 impl LegacyAgentRuntimeDriver {
-    pub fn new(artifact_service: std::sync::Arc<ArtifactService>) -> Self {
-        Self { artifact_service }
+    pub fn new(llm_provider: std::sync::Arc<dyn AgentLlmProvider>) -> Self {
+        Self { llm_provider }
     }
 }
 
@@ -28,8 +27,6 @@ impl RuntimeDriver for LegacyAgentRuntimeDriver {
         events: RuntimeEventSink,
         mut cancellation: RuntimeCancellation,
     ) -> Result<RuntimeCompletion, RuntimeError> {
-        let session_id = request.session_id.clone();
-        let owner_id = request.user_id.clone();
         let history = request
             .history
             .into_iter()
@@ -40,10 +37,11 @@ impl RuntimeDriver for LegacyAgentRuntimeDriver {
                 tool_call_id: None,
             })
             .collect();
-        let client = std::sync::Arc::new(
-            crate::llm::LlmClient::for_user(&request.user_id, request.preferred_model.as_deref())
-                .await,
-        );
+        let client = self
+            .llm_provider
+            .for_user(&request.user_id, request.preferred_model.as_deref())
+            .await
+            .map_err(|error| RuntimeError::Model(error.to_string()))?;
         let attachments = request
             .attachments
             .into_iter()
@@ -117,28 +115,48 @@ impl RuntimeDriver for LegacyAgentRuntimeDriver {
                         })
                         .await?;
                 }
+                Some(AgentEvent::PresentationProgress { progress }) => {
+                    events
+                        .emit(RuntimeEvent::PresentationProgress { progress })
+                        .await?;
+                }
                 Some(AgentEvent::Artifact { artifact }) => {
-                    let bytes = serde_json::to_vec_pretty(&artifact.content)
-                        .map_err(|error| RuntimeError::Tool(error.to_string()))?;
-                    let publication = self
-                        .artifact_service
-                        .publish(ArtifactDraft {
-                            session_id: session_id.clone(),
-                            owner_id: owner_id.clone(),
-                            kind: artifact.kind.clone(),
-                            title: artifact.title.clone(),
-                            extension: "json".into(),
-                            content: artifact.content,
-                            bytes,
-                        })
-                        .await
-                        .map_err(|error| RuntimeError::Tool(error.to_string()))?;
+                    let bytes = if artifact.bytes.is_empty() {
+                        match artifact.extension.as_str() {
+                            "md" => artifact
+                                .content
+                                .get("markdown")
+                                .and_then(serde_json::Value::as_str)
+                                .map(str::as_bytes)
+                                .map(ToOwned::to_owned)
+                                .ok_or_else(|| {
+                                    RuntimeError::Tool(
+                                        "markdown artifact has no markdown content".into(),
+                                    )
+                                })?,
+                            "drawio" => artifact
+                                .content
+                                .get("xml")
+                                .and_then(serde_json::Value::as_str)
+                                .map(str::as_bytes)
+                                .map(ToOwned::to_owned)
+                                .ok_or_else(|| {
+                                    RuntimeError::Tool("drawio artifact has no XML content".into())
+                                })?,
+                            _ => serde_json::to_vec_pretty(&artifact.content)
+                                .map_err(|error| RuntimeError::Tool(error.to_string()))?,
+                        }
+                    } else {
+                        artifact.bytes
+                    };
                     events
                         .emit(RuntimeEvent::ArtifactProduced {
                             artifact: RuntimeArtifact {
-                                kind: publication.kind,
-                                title: publication.title,
-                                content: publication.content,
+                                kind: artifact.kind,
+                                title: artifact.title,
+                                extension: artifact.extension,
+                                content: artifact.content,
+                                bytes,
                             },
                         })
                         .await?;

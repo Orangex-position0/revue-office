@@ -12,7 +12,6 @@
 /// - 去掉了项目索引/信号提取（revueOffice 是办公场景，不是代码场景）
 /// - 去掉了模型分类器（由 LLM ReAct 循环本身承担模型决策）
 /// - 增加了办公场景特有的意图类型（文档/表格/图片/视频等）
-
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -272,64 +271,163 @@ struct WeightedKeywordRule {
 const KEYWORD_RULES: &[WeightedKeywordRule] = &[
     // ── PPT ──
     WeightedKeywordRule {
-        keywords: &["ppt", "演示文稿", "幻灯片", "presentation", "汇报材料", "做个ppt", "做ppt", "生成ppt"],
+        keywords: &[
+            "ppt",
+            "演示文稿",
+            "幻灯片",
+            "presentation",
+            "汇报材料",
+            "做个ppt",
+            "做ppt",
+            "生成ppt",
+        ],
         intent: IntentType::Ppt,
         weight: 0.95,
         base_confidence: 0.8,
     },
     // ── 文档 ──
     WeightedKeywordRule {
-        keywords: &["word文档", "word", "docx", "报告", "prd", "方案书", "文档", "生成文档"],
+        keywords: &[
+            "word文档",
+            "word",
+            "docx",
+            "报告",
+            "prd",
+            "方案书",
+            "文档",
+            "生成文档",
+        ],
         intent: IntentType::Doc,
         weight: 0.9,
         base_confidence: 0.8,
     },
     // ── Markdown ──
     WeightedKeywordRule {
-        keywords: &["markdown", "md", "readme", "知识库", "说明文档", "操作手册", "会议纪要", "调研整理", "纪要"],
+        keywords: &[
+            "markdown",
+            "md",
+            "readme",
+            "知识库",
+            "说明文档",
+            "操作手册",
+            "会议纪要",
+            "调研整理",
+            "纪要",
+        ],
         intent: IntentType::Markdown,
         weight: 0.85,
         base_confidence: 0.75,
     },
     // ── 表格 ──
     WeightedKeywordRule {
-        keywords: &["excel", "xlsx", "表格", "数据分析", "排期", "预算", "数据指标", "csv"],
+        keywords: &[
+            "excel",
+            "xlsx",
+            "表格",
+            "数据分析",
+            "排期",
+            "预算",
+            "数据指标",
+            "csv",
+        ],
         intent: IntentType::Sheet,
         weight: 0.9,
         base_confidence: 0.8,
     },
     // ── 图表 ──
     WeightedKeywordRule {
-        keywords: &["图表", "可视化", "趋势图", "柱状图", "折线图", "饼图", "占比", "排名", "漏斗", "仪表盘", "echarts"],
+        keywords: &[
+            "图表",
+            "可视化",
+            "趋势图",
+            "柱状图",
+            "折线图",
+            "饼图",
+            "占比",
+            "排名",
+            "漏斗",
+            "仪表盘",
+            "echarts",
+        ],
         intent: IntentType::Chart,
         weight: 0.85,
         base_confidence: 0.75,
     },
     // ── draw.io ──
     WeightedKeywordRule {
-        keywords: &["draw.io", "流程图", "架构图", "泳道图", "拓扑图", "er图", "时序图", "uml"],
+        keywords: &[
+            "draw.io",
+            "流程图",
+            "架构图",
+            "泳道图",
+            "拓扑图",
+            "er图",
+            "时序图",
+            "uml",
+        ],
         intent: IntentType::Drawio,
         weight: 0.9,
         base_confidence: 0.8,
     },
     // ── 图片生成 ──
     WeightedKeywordRule {
-        keywords: &["生成图片", "做图片", "画图", "出图", "图生图", "以图生图", "改图", "修图", "重绘", "换风格",
-                     "换背景", "换衣服", "换装", "变装", "换发型", "去除背景", "抠图", "扩图"],
+        keywords: &[
+            "生成图片",
+            "做图片",
+            "画图",
+            "出图",
+            "图生图",
+            "以图生图",
+            "改图",
+            "修图",
+            "重绘",
+            "换风格",
+            "换背景",
+            "换衣服",
+            "换装",
+            "变装",
+            "换发型",
+            "去除背景",
+            "抠图",
+            "扩图",
+        ],
         intent: IntentType::Image,
         weight: 0.9,
         base_confidence: 0.8,
     },
     WeightedKeywordRule {
-        keywords: &["海报", "封面", "配图", "主视觉", "插画", "banner", "视觉稿", "logo"],
+        keywords: &[
+            "海报",
+            "封面",
+            "配图",
+            "主视觉",
+            "插画",
+            "banner",
+            "视觉稿",
+            "logo",
+        ],
         intent: IntentType::Image,
         weight: 0.75,
         base_confidence: 0.7,
     },
     // ── 视频生成 ──
     WeightedKeywordRule {
-        keywords: &["生成视频", "做视频", "制作视频", "图生视频", "以图生视频", "短视频", "短片",
-                     "宣传片", "动起来", "动态化", "动态海报", "视频广告", "片头", "转场动画"],
+        keywords: &[
+            "生成视频",
+            "做视频",
+            "制作视频",
+            "图生视频",
+            "以图生视频",
+            "短视频",
+            "短片",
+            "宣传片",
+            "动起来",
+            "动态化",
+            "动态海报",
+            "视频广告",
+            "片头",
+            "转场动画",
+        ],
         intent: IntentType::Video,
         weight: 0.9,
         base_confidence: 0.8,
@@ -342,24 +440,60 @@ const KEYWORD_RULES: &[WeightedKeywordRule] = &[
     },
     // ── 联网搜索 ──
     WeightedKeywordRule {
-        keywords: &["最新", "官网", "新闻", "政策", "联网查询", "检索资料", "搜索一下", "搜索资料",
-                     "网上查", "查一下", "帮我查"],
+        keywords: &[
+            "最新",
+            "官网",
+            "新闻",
+            "政策",
+            "联网查询",
+            "检索资料",
+            "搜索一下",
+            "搜索资料",
+            "网上查",
+            "查一下",
+            "帮我查",
+        ],
         intent: IntentType::WebSearch,
         weight: 0.8,
         base_confidence: 0.7,
     },
     // ── 识图 ──
     WeightedKeywordRule {
-        keywords: &["这是什么", "帮我识别", "提取文字", "ocr", "解释图片", "分析截图",
-                     "描述图里", "图里内容", "图片内容", "图片说了", "这张图"],
+        keywords: &[
+            "这是什么",
+            "帮我识别",
+            "提取文字",
+            "ocr",
+            "解释图片",
+            "分析截图",
+            "描述图里",
+            "图里内容",
+            "图片内容",
+            "图片说了",
+            "这张图",
+        ],
         intent: IntentType::ImageUnderstanding,
         weight: 0.85,
         base_confidence: 0.75,
     },
     // ── 文本生成 ──
     WeightedKeywordRule {
-        keywords: &["写提示词", "出提示词", "写prompt", "写脚本", "构思", "规划", "出方案",
-                     "写方案", "做个方案", "总结", "整理", "梳理", "提炼", "写个大纲"],
+        keywords: &[
+            "写提示词",
+            "出提示词",
+            "写prompt",
+            "写脚本",
+            "构思",
+            "规划",
+            "出方案",
+            "写方案",
+            "做个方案",
+            "总结",
+            "整理",
+            "梳理",
+            "提炼",
+            "写个大纲",
+        ],
         intent: IntentType::TextGenerate,
         weight: 0.85,
         base_confidence: 0.8,
@@ -424,7 +558,12 @@ impl IntentAnalyzer {
     }
 
     /// 分析用户意图
-    pub fn analyze(&mut self, user_input: &str, session_id: &str, has_image_attachment: bool) -> IntentResult {
+    pub fn analyze(
+        &mut self,
+        user_input: &str,
+        session_id: &str,
+        has_image_attachment: bool,
+    ) -> IntentResult {
         let text = user_input.trim();
         let lower = text.to_lowercase();
 
@@ -493,7 +632,11 @@ impl IntentAnalyzer {
         let mut best_match: Option<(&WeightedKeywordRule, usize)> = None;
 
         for rule in KEYWORD_RULES {
-            let match_count = rule.keywords.iter().filter(|kw| lower.contains(*kw)).count();
+            let match_count = rule
+                .keywords
+                .iter()
+                .filter(|kw| lower.contains(*kw))
+                .count();
             if match_count > 0 {
                 match &best_match {
                     Some((best, best_count)) => {
@@ -513,9 +656,8 @@ impl IntentAnalyzer {
 
         match best_match {
             Some((rule, match_count)) => {
-                let confidence = (rule.base_confidence
-                    + (match_count as f32 * 0.05).min(0.15))
-                .min(0.95);
+                let confidence =
+                    (rule.base_confidence + (match_count as f32 * 0.05).min(0.15)).min(0.95);
 
                 let mut entities = self.extract_entities(text);
 
@@ -588,9 +730,13 @@ impl IntentAnalyzer {
         let lower = text.to_lowercase();
 
         // 简单启发式
-        let intent = if lower.contains("?") || lower.contains("？")
-            || lower.contains("什么") || lower.contains("如何") || lower.contains("怎么")
-            || lower.contains("为什么") || lower.contains("能不能")
+        let intent = if lower.contains("?")
+            || lower.contains("？")
+            || lower.contains("什么")
+            || lower.contains("如何")
+            || lower.contains("怎么")
+            || lower.contains("为什么")
+            || lower.contains("能不能")
         {
             IntentType::Chat
         } else if lower.contains("创建") || lower.contains("新建") || lower.contains("添加") {
@@ -708,9 +854,11 @@ impl IntentAnalyzer {
         match result.temporal_order {
             TemporalOrder::Sequential => {
                 if let Some(ref first) = result.entities.first_step {
-                    parts.push(format!("- 用户意图是分步执行：先「{}」，再「{}」",
+                    parts.push(format!(
+                        "- 用户意图是分步执行：先「{}」，再「{}」",
                         first,
-                        result.entities.second_step.as_deref().unwrap_or("后续操作")));
+                        result.entities.second_step.as_deref().unwrap_or("后续操作")
+                    ));
                     parts.push("- 必须先完成第一步，再考虑第二步，不要跳步".to_string());
                 }
             }
@@ -722,7 +870,9 @@ impl IntentAnalyzer {
 
         if result.intent == IntentType::TextGenerate {
             parts.push("- 用户当前意图是文本/文档输出，不是直接生成图片或视频".to_string());
-            parts.push("- 优先使用 md_generate 或 doc_generate 生成文本内容，或直接回复文本".to_string());
+            parts.push(
+                "- 优先使用 md_generate 或 doc_generate 生成文本内容，或直接回复文本".to_string(),
+            );
             parts.push("- 不要调用 image_prompt 或 video_generate".to_string());
         }
 
@@ -769,12 +919,8 @@ impl IntentAnalyzer {
                 // 普通对话/未知意图不限制工具
                 None
             }
-            IntentType::Image => {
-                Some(vec!["image_prompt".to_string()])
-            }
-            IntentType::Video => {
-                Some(vec!["video_generate".to_string()])
-            }
+            IntentType::Image => Some(vec!["image_prompt".to_string()]),
+            IntentType::Video => Some(vec!["video_generate".to_string()]),
             _ => None,
         }
     }
@@ -799,7 +945,11 @@ mod tests {
         let mut analyzer = IntentAnalyzer::new();
 
         // "先帮我写提示词" → TextGenerate
-        let result = analyzer.analyze("先帮我写提示词，我想做一个动画片，关于西游记孙悟空的", "s1", false);
+        let result = analyzer.analyze(
+            "先帮我写提示词，我想做一个动画片，关于西游记孙悟空的",
+            "s1",
+            false,
+        );
         assert_eq!(result.intent, IntentType::TextGenerate);
         assert!(result.confidence > 0.7);
 
@@ -837,7 +987,10 @@ mod tests {
 
         let result = analyzer.analyze("帮我改图", "s1", true);
         assert_eq!(result.intent, IntentType::Image);
-        assert_eq!(result.entities.image_mode.as_deref(), Some("image_to_image"));
+        assert_eq!(
+            result.entities.image_mode.as_deref(),
+            Some("image_to_image")
+        );
     }
 
     #[test]
@@ -846,7 +999,10 @@ mod tests {
 
         let result = analyzer.analyze("让这张图片动起来", "s1", true);
         assert_eq!(result.intent, IntentType::Video);
-        assert_eq!(result.entities.video_mode.as_deref(), Some("image_to_video"));
+        assert_eq!(
+            result.entities.video_mode.as_deref(),
+            Some("image_to_video")
+        );
     }
 
     #[test]

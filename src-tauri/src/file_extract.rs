@@ -276,7 +276,8 @@ fn extract_pptx_text_elements(xml: &str) -> Vec<String> {
 
 /// 从 slide XML 中提取背景色（简易）
 fn extract_pptx_backgrounds(xml: &str) -> Vec<String> {
-    let bg_re = Regex::new(r#"(?:a:)?srgbClr\s+val="([0-9A-Fa-f]{6})""#).unwrap_or_else(|_| Regex::new(r"placeholder").unwrap());
+    let bg_re = Regex::new(r#"(?:a:)?srgbClr\s+val="([0-9A-Fa-f]{6})""#)
+        .unwrap_or_else(|_| Regex::new(r"placeholder").unwrap());
     bg_re
         .captures_iter(xml)
         .filter_map(|cap| cap.get(1).map(|m| m.as_str().to_string()))
@@ -291,7 +292,8 @@ fn extract_xlsx_structured(bytes: &[u8]) -> Result<Value> {
     let shared_strings = read_shared_strings(&mut archive).unwrap_or_default();
 
     // 读取 workbook.xml 获取 sheet 名称映射
-    let mut sheet_display_names: std::collections::HashMap<String, String> = std::collections::HashMap::new();
+    let mut sheet_display_names: std::collections::HashMap<String, String> =
+        std::collections::HashMap::new();
     let wb_xml_text = {
         let mut text = String::new();
         if let Ok(mut f) = archive.by_name("xl/workbook.xml") {
@@ -301,13 +303,16 @@ fn extract_xlsx_structured(bytes: &[u8]) -> Result<Value> {
     };
     if !wb_xml_text.is_empty() {
         let xml = &wb_xml_text;
-        let sheet_re = Regex::new(r#"<sheet[^>]+name="([^"]+)"[^>]+sheetId="[^"]+"[^>]+r:id="(rId[^"]+)"[^>]*/>"#)
-            .unwrap_or_else(|_| Regex::new(r"placeholder").unwrap());
+        let sheet_re = Regex::new(
+            r#"<sheet[^>]+name="([^"]+)"[^>]+sheetId="[^"]+"[^>]+r:id="(rId[^"]+)"[^>]*/>"#,
+        )
+        .unwrap_or_else(|_| Regex::new(r"placeholder").unwrap());
         let rel_re = Regex::new(r#"<Relationship[^>]+Id="([^"]+)"[^>]+Target="([^"]+)"[^>]*/>"#)
             .unwrap_or_else(|_| Regex::new(r"placeholder").unwrap());
 
         // 读取 rels
-        let mut rels_map: std::collections::HashMap<String, String> = std::collections::HashMap::new();
+        let mut rels_map: std::collections::HashMap<String, String> =
+            std::collections::HashMap::new();
         let rels_text = {
             let mut text = String::new();
             if let Ok(mut f) = archive.by_name("xl/_rels/workbook.xml.rels") {
@@ -501,7 +506,8 @@ fn parse_docx_body(xml: &str) -> Vec<Value> {
 /// 解析单个 <w:p> 段落
 fn parse_docx_paragraph(xml: &str) -> Option<Value> {
     // 检查是否标题样式
-    let style_re = Regex::new(r#"<w:pStyle\s+w:val="([^"]+)"#).unwrap_or_else(|_| Regex::new(r"placeholder").unwrap());
+    let style_re = Regex::new(r#"<w:pStyle\s+w:val="([^"]+)"#)
+        .unwrap_or_else(|_| Regex::new(r"placeholder").unwrap());
     let style = style_re
         .captures(xml)
         .and_then(|cap| cap.get(1))
@@ -514,7 +520,9 @@ fn parse_docx_paragraph(xml: &str) -> Option<Value> {
         return None;
     }
 
-    let is_heading = style.contains("Heading") || style.starts_with("heading") || style.starts_with("\u{6807}\u{9898}");
+    let is_heading = style.contains("Heading")
+        || style.starts_with("heading")
+        || style.starts_with("\u{6807}\u{9898}");
     let level: u32 = if is_heading {
         // 尝试从样式名提取级别
         let style_name = style_re

@@ -151,6 +151,8 @@ impl OfficeTool for WebSearchTool {
                         "providers_tried": providers_tried,
                         "results": outcome.items,
                     }),
+                    extension: "json".into(),
+                    bytes: vec![],
                 };
 
                 ToolResult {

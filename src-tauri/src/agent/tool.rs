@@ -20,6 +20,8 @@ pub struct ToolContext {
     pub emit: Arc<dyn Fn(&str, serde_json::Value) + Send + Sync>,
     /// 共享上下文（跨工具传递，如 PPT 大纲规划）
     pub scratchpad: Arc<Mutex<HashMap<String, serde_json::Value>>>,
+    /// 已迁移演示文稿工具使用的类型化进度通道。
+    presentation_progress: Option<Arc<dyn PresentationProgressSink>>,
     /// 用户工具配置（前端传入，如视频时长、宽高比等）
     pub tool_config: Option<serde_json::Value>,
 }
@@ -41,6 +43,7 @@ impl ToolContext {
             attachments,
             emit: Arc::new(emit),
             scratchpad: Arc::new(Mutex::new(HashMap::new())),
+            presentation_progress: None,
             tool_config: None,
         }
     }
@@ -48,6 +51,18 @@ impl ToolContext {
     pub fn with_tool_config(mut self, config: serde_json::Value) -> Self {
         self.tool_config = Some(config);
         self
+    }
+
+    pub fn with_presentation_progress(
+        mut self,
+        progress: Arc<dyn PresentationProgressSink>,
+    ) -> Self {
+        self.presentation_progress = Some(progress);
+        self
+    }
+
+    pub fn presentation_progress(&self) -> Option<Arc<dyn PresentationProgressSink>> {
+        self.presentation_progress.clone()
     }
 
     /// 获取工具配置中的某个字段值
@@ -69,6 +84,14 @@ pub struct ToolArtifact {
     pub kind: String, // document | ppt | drawio | sheet | image | code | mixed
     pub title: String,
     pub content: serde_json::Value,
+    #[serde(default = "default_artifact_extension")]
+    pub extension: String,
+    #[serde(default)]
+    pub bytes: Vec<u8>,
+}
+
+fn default_artifact_extension() -> String {
+    "json".into()
 }
 
 /// 工具结果
@@ -223,49 +246,22 @@ impl ToolProgressSink {
 }
 
 pub struct PresentationToolProgressAdapter {
-    emit: Arc<dyn Fn(&str, serde_json::Value) + Send + Sync>,
+    sender: tokio::sync::mpsc::Sender<PresentationProgress>,
 }
 
 impl PresentationToolProgressAdapter {
-    pub fn new(emit: Arc<dyn Fn(&str, serde_json::Value) + Send + Sync>) -> Self {
-        Self { emit }
+    pub fn new(sender: tokio::sync::mpsc::Sender<PresentationProgress>) -> Self {
+        Self { sender }
     }
 }
 
 #[async_trait]
 impl PresentationProgressSink for PresentationToolProgressAdapter {
     async fn emit(&self, progress: PresentationProgress) -> Result<(), PresentationProgressError> {
-        match progress {
-            PresentationProgress::Planning => (self.emit)(
-                "state_update",
-                serde_json::json!({
-                    "phase": "running",
-                    "step": "规划 PPT 大纲",
-                    "detail": "正在规划演示文稿结构...",
-                    "at": chrono::Utc::now().to_rfc3339(),
-                }),
-            ),
-            PresentationProgress::ProjectCreated { project } => (self.emit)(
-                "project_update",
-                serde_json::to_value(project).unwrap_or_else(|_| serde_json::json!({})),
-            ),
-            PresentationProgress::SlideGenerated {
-                project,
-                current_index,
-                total_slides,
-            } => {
-                let mut value =
-                    serde_json::to_value(project).unwrap_or_else(|_| serde_json::json!({}));
-                if let Some(object) = value.as_object_mut() {
-                    object.insert("current_index".into(), current_index.into());
-                    object.insert("total_slides".into(), total_slides.into());
-                    object.insert("slide_count".into(), (current_index + 1).into());
-                }
-                (self.emit)("slide_update", value);
-            }
-            PresentationProgress::Completed { .. } => {}
-        }
-        Ok(())
+        self.sender
+            .send(progress)
+            .await
+            .map_err(|_| PresentationProgressError)
     }
 }
 

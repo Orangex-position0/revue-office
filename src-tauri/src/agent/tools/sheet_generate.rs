@@ -196,6 +196,8 @@ impl OfficeTool for SheetGenerateTool {
                     "title": output.title,
                     "tables": output.tables,
                 }),
+                extension: "json".into(),
+                bytes: vec![],
             }],
         )
     }

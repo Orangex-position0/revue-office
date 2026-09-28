@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::contracts::agent_run::RuntimeArtifact;
+use crate::contracts::artifact::ArtifactPublication;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
@@ -21,7 +21,8 @@ pub enum ApplicationEvent {
         slide: serde_json::Value,
     },
     ArtifactUpdated {
-        artifact: RuntimeArtifact,
+        artifact: ArtifactPublication,
+        artifacts: Vec<ArtifactPublication>,
     },
     Message {
         content: String,
@@ -32,6 +33,8 @@ pub enum ApplicationEvent {
     },
     Completed {
         summary: String,
+        artifacts: Vec<ArtifactPublication>,
+        new_artifacts: Vec<ArtifactPublication>,
     },
     Failed {
         code: String,

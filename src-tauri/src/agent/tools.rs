@@ -12,12 +12,22 @@ pub mod video_generate;
 pub mod web_search;
 
 use super::registry::REGISTRY;
+use crate::capabilities::presentation::PresentationCapability;
+use crate::ports::presentation_export::PresentationExporter;
 use std::sync::Arc;
 
-pub async fn register_all_tools() {
-    REGISTRY.register(Arc::new(ppt_plan::PptPlanTool)).await;
+pub async fn register_all_tools(
+    presentation: Arc<PresentationCapability>,
+    presentation_exporter: Arc<dyn PresentationExporter>,
+) {
     REGISTRY
-        .register(Arc::new(ppt_generate::PptGenerateTool))
+        .register(Arc::new(ppt_plan::PptPlanTool::new(presentation.clone())))
+        .await;
+    REGISTRY
+        .register(Arc::new(ppt_generate::PptGenerateTool::new(
+            presentation,
+            presentation_exporter,
+        )))
         .await;
     REGISTRY
         .register(Arc::new(doc_generate::DocGenerateTool))

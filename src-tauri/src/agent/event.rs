@@ -2,8 +2,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::agent::tool::LegacyToolProgress;
 use crate::contracts::agent_run::RuntimeArtifact;
+use crate::contracts::presentation::PresentationProgress;
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum RuntimeEvent {
     Thinking {
@@ -31,6 +32,9 @@ pub enum RuntimeEvent {
     },
     TurnFinished {
         turn: usize,
+    },
+    PresentationProgress {
+        progress: PresentationProgress,
     },
     LegacyProgress {
         progress: LegacyToolProgress,
