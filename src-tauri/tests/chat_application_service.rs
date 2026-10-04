@@ -2,17 +2,16 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
-use revue_office_lib::agent::event::RuntimeEvent;
-use revue_office_lib::agent::runtime::{
-    AgentRuntime, RuntimeCancellation, RuntimeDriver, RuntimeError, RuntimeEventSink,
+use revue_office_lib::agent::{
+    AgentRunner, OfficeAgentEvent, OfficeAgentRequest, OfficeAgentRunHandle,
+    OfficeCancellationHandle, OfficeFailureKind,
 };
 use revue_office_lib::application::chat_service::{ChatApplicationService, ChatCommand};
-use revue_office_lib::application::event::ApplicationEvent;
-use revue_office_lib::contracts::agent_run::{RuntimeCompletion, RuntimeRequest};
-use revue_office_lib::contracts::conversation::{
+use revue_office_lib::application::conversations::model::{
     Conversation, ConversationArtifact, ConversationMessage, NewConversation,
 };
-use revue_office_lib::ports::repositories::session::{SessionRepository, SessionRepositoryError};
+use revue_office_lib::application::conversations::{SessionRepository, SessionRepositoryError};
+use revue_office_lib::application::event::ApplicationEvent;
 
 #[derive(Default)]
 struct FakeSessionRepository {
@@ -150,50 +149,56 @@ impl SessionRepository for FakeSessionRepository {
     }
 }
 
-struct FakeNoToolDriver {
-    requests: Arc<Mutex<Vec<RuntimeRequest>>>,
+struct FakeNoToolAgent {
+    requests: Arc<Mutex<Vec<OfficeAgentRequest>>>,
 }
 
-#[async_trait]
-impl RuntimeDriver for FakeNoToolDriver {
-    async fn execute(
-        &self,
-        request: RuntimeRequest,
-        events: RuntimeEventSink,
-        _cancellation: RuntimeCancellation,
-    ) -> Result<RuntimeCompletion, RuntimeError> {
+impl AgentRunner for FakeNoToolAgent {
+    fn start(&self, request: OfficeAgentRequest) -> OfficeAgentRunHandle {
+        let run_id = request.run_id.clone();
         self.requests.lock().unwrap().push(request);
-        events
-            .emit(RuntimeEvent::Thinking {
-                content: "Preparing response".into(),
-            })
-            .await?;
-        events
-            .emit(RuntimeEvent::MessageProduced {
-                content: "Assistant reply".into(),
-            })
-            .await?;
-        Ok(RuntimeCompletion {
-            summary: "Finished".into(),
-        })
+        fake_run(
+            run_id,
+            vec![
+                OfficeAgentEvent::Thinking {
+                    content: "Preparing response".into(),
+                },
+                OfficeAgentEvent::MessageProduced {
+                    content: "Assistant reply".into(),
+                },
+                OfficeAgentEvent::Completed {
+                    summary: "Finished".into(),
+                },
+            ],
+        )
     }
+}
+
+fn fake_run(run_id: String, events: Vec<OfficeAgentEvent>) -> OfficeAgentRunHandle {
+    let (sender, receiver) = tokio::sync::mpsc::channel(events.len().max(1));
+    let (cancellation, _cancelled) = OfficeCancellationHandle::channel();
+    tokio::spawn(async move {
+        for event in events {
+            if sender.send(event).await.is_err() {
+                break;
+            }
+        }
+    });
+    OfficeAgentRunHandle::new(run_id, receiver, cancellation)
 }
 
 #[tokio::test]
 async fn chat_application_service_creates_session_persists_messages_and_publishes_one_terminal() {
     let repository = Arc::new(FakeSessionRepository::default());
     let requests = Arc::new(Mutex::new(Vec::new()));
-    let runtime = Arc::new(AgentRuntime::new(
-        Arc::new(FakeNoToolDriver {
-            requests: requests.clone(),
-        }),
-        2,
-    ));
-    let service = ChatApplicationService::new(repository.clone(), runtime, 4);
+    let agent = Arc::new(FakeNoToolAgent {
+        requests: requests.clone(),
+    });
+    let service = ChatApplicationService::new(repository.clone(), agent, 4);
 
     let mut run = service
         .start_chat(ChatCommand {
-            owner_id: "owner-1".into(),
+            actor: revue_office_lib::application::identity::Actor::user("owner-1"),
             session_id: None,
             project_id: None,
             message: "Hello application boundary".into(),
@@ -234,28 +239,27 @@ async fn chat_application_service_creates_session_persists_messages_and_publishe
     assert!(requests.lock().unwrap()[0].history.is_empty());
 }
 
-struct FailingDriver;
+struct FailingAgent;
 
-#[async_trait]
-impl RuntimeDriver for FailingDriver {
-    async fn execute(
-        &self,
-        _request: RuntimeRequest,
-        _events: RuntimeEventSink,
-        _cancellation: RuntimeCancellation,
-    ) -> Result<RuntimeCompletion, RuntimeError> {
-        Err(RuntimeError::Model("fake provider failure".into()))
+impl AgentRunner for FailingAgent {
+    fn start(&self, request: OfficeAgentRequest) -> OfficeAgentRunHandle {
+        fake_run(
+            request.run_id,
+            vec![OfficeAgentEvent::Failed {
+                kind: OfficeFailureKind::Provider,
+                message: "fake provider failure".into(),
+            }],
+        )
     }
 }
 
 #[tokio::test]
 async fn chat_application_service_publishes_exactly_one_failed_terminal() {
     let repository = Arc::new(FakeSessionRepository::default());
-    let runtime = Arc::new(AgentRuntime::new(Arc::new(FailingDriver), 1));
-    let service = ChatApplicationService::new(repository, runtime, 2);
+    let service = ChatApplicationService::new(repository, Arc::new(FailingAgent), 2);
     let mut run = service
         .start_chat(ChatCommand {
-            owner_id: "owner-1".into(),
+            actor: revue_office_lib::application::identity::Actor::user("owner-1"),
             session_id: None,
             project_id: None,
             message: "Fail safely".into(),
@@ -306,17 +310,14 @@ async fn chat_application_service_restores_owned_history_before_starting_runtime
         }],
     );
     let requests = Arc::new(Mutex::new(Vec::new()));
-    let runtime = Arc::new(AgentRuntime::new(
-        Arc::new(FakeNoToolDriver {
-            requests: requests.clone(),
-        }),
-        2,
-    ));
-    let service = ChatApplicationService::new(repository.clone(), runtime, 4);
+    let agent = Arc::new(FakeNoToolAgent {
+        requests: requests.clone(),
+    });
+    let service = ChatApplicationService::new(repository.clone(), agent, 4);
 
     let mut run = service
         .start_chat(ChatCommand {
-            owner_id: "owner-1".into(),
+            actor: revue_office_lib::application::identity::Actor::user("owner-1"),
             session_id: Some("existing-session".into()),
             project_id: None,
             message: "Continue".into(),

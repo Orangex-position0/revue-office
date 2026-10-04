@@ -1,26 +1,23 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use revue_office_lib::capabilities::presentation::PresentationCapability;
-use revue_office_lib::contracts::presentation::{
-    PresentationGenerateRequest, PresentationPlan, PresentationPlanRequest, PresentationProgress,
-    PresentationProject, PresentationSlidePlan,
+use revue_office_lib::capabilities::presentation::{
+    PresentationCapability, PresentationExport, PresentationExportError, PresentationExporter,
+    PresentationGenerateRequest, PresentationPlan, PresentationPlanRequest, PresentationPlanner,
+    PresentationPlannerError, PresentationProgress, PresentationProgressError,
+    PresentationProgressSink, PresentationProject, PresentationSlidePlan, PresentationStore,
+    PresentationStoreError,
 };
-use revue_office_lib::ports::llm::{PresentationLlm, PresentationLlmError};
-use revue_office_lib::ports::presentation_progress::{
-    PresentationProgressError, PresentationProgressSink,
-};
-use revue_office_lib::ports::presentation_store::{PresentationStore, PresentationStoreError};
 use tokio::sync::Mutex;
 
-struct FakeLlm;
+struct FakePlanner;
 
 #[async_trait]
-impl PresentationLlm for FakeLlm {
+impl PresentationPlanner for FakePlanner {
     async fn plan(
         &self,
         request: PresentationPlanRequest,
-    ) -> Result<PresentationPlan, PresentationLlmError> {
+    ) -> Result<PresentationPlan, PresentationPlannerError> {
         Ok(PresentationPlan {
             title: request.topic,
             slides: vec![
@@ -70,6 +67,35 @@ impl PresentationStore for FakeStore {
     }
 }
 
+struct FakeExporter;
+
+#[async_trait]
+impl PresentationExporter for FakeExporter {
+    async fn export(
+        &self,
+        _project: &PresentationProject,
+    ) -> Result<PresentationExport, PresentationExportError> {
+        Ok(PresentationExport {
+            format: "pptx".into(),
+            bytes: b"fake-pptx".to_vec(),
+        })
+    }
+}
+
+struct FailingExporter;
+
+#[async_trait]
+impl PresentationExporter for FailingExporter {
+    async fn export(
+        &self,
+        _project: &PresentationProject,
+    ) -> Result<PresentationExport, PresentationExportError> {
+        Err(PresentationExportError::Failed(anyhow::anyhow!(
+            "injected export failure"
+        )))
+    }
+}
+
 #[derive(Default)]
 struct FakeProgress {
     events: Mutex<Vec<PresentationProgress>>,
@@ -84,12 +110,13 @@ impl PresentationProgressSink for FakeProgress {
 }
 
 #[tokio::test]
-async fn presentation_capability_plans_and_generates_each_slide_through_ports() {
+async fn presentation_capability_plans_generates_persists_and_exports_through_owned_ports() {
     let store = Arc::new(FakeStore::default());
     let progress = FakeProgress::default();
-    let capability = PresentationCapability::new(Arc::new(FakeLlm), store.clone());
+    let capability =
+        PresentationCapability::new(Arc::new(FakePlanner), store.clone(), Arc::new(FakeExporter));
 
-    let project = capability
+    let output = capability
         .generate(
             PresentationGenerateRequest {
                 owner_id: "owner-1".into(),
@@ -104,14 +131,16 @@ async fn presentation_capability_plans_and_generates_each_slide_through_ports() 
         .await
         .expect("presentation should be generated");
 
-    assert_eq!(project.slides.len(), 2);
+    assert_eq!(output.project.slides.len(), 2);
+    assert_eq!(output.format, "pptx");
+    assert_eq!(output.bytes, b"fake-pptx");
     assert_eq!(
         store
             .saves
             .lock()
             .await
             .iter()
-            .map(|p| p.slides.len())
+            .map(|project| project.slides.len())
             .collect::<Vec<_>>(),
         vec![0, 1, 2]
     );
@@ -135,9 +164,52 @@ async fn presentation_capability_plans_and_generates_each_slide_through_ports() 
             ..
         }
     ));
-    assert!(matches!(events[4], PresentationProgress::Completed { .. }));
+    assert!(matches!(
+        events[4],
+        PresentationProgress::GenerationCompleted { .. }
+    ));
     assert_eq!(
-        store.load(&project.id).await.unwrap().unwrap().slides.len(),
+        store
+            .load(&output.project.id)
+            .await
+            .unwrap()
+            .unwrap()
+            .slides
+            .len(),
         2
+    );
+}
+
+#[tokio::test]
+async fn presentation_capability_export_failure_produces_no_completed_candidate() {
+    let progress = FakeProgress::default();
+    let capability = PresentationCapability::new(
+        Arc::new(FakePlanner),
+        Arc::new(FakeStore::default()),
+        Arc::new(FailingExporter),
+    );
+
+    let result = capability
+        .generate(
+            PresentationGenerateRequest {
+                owner_id: "owner-1".into(),
+                title: "Architecture".into(),
+                topic: "Architecture".into(),
+                theme: "tech".into(),
+                preferred_model: None,
+                plan: None,
+            },
+            &progress,
+        )
+        .await;
+
+    assert!(result.is_err());
+    assert!(
+        !progress
+            .events
+            .lock()
+            .await
+            .iter()
+            .any(|event| matches!(event, PresentationProgress::GenerationCompleted { .. }))
     );
 }

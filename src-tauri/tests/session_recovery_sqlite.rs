@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
-use revue_office_lib::application::session_service::SessionApplicationService;
-use revue_office_lib::contracts::conversation::{
+use revue_office_lib::application::conversations::SessionApplicationService;
+use revue_office_lib::application::conversations::model::{
     ConversationArtifact, ConversationMessage, NewConversation,
 };
 use revue_office_lib::infrastructure::persistence::sqlite::SqliteSessionRepository;
@@ -49,17 +49,20 @@ async fn restores_messages_and_legacy_artifacts_after_reconnecting() {
 
     let service = SessionApplicationService::new(repository);
     let conversation = service
-        .create(NewConversation {
-            owner_id: "owner-1".into(),
-            project_id: Some("project-1".into()),
-            tool_kind: Some("presentation".into()),
-            title: "Persistent conversation".into(),
-        })
+        .create(
+            &revue_office_lib::application::identity::Actor::user("owner-1"),
+            NewConversation {
+                owner_id: "owner-1".into(),
+                project_id: Some("project-1".into()),
+                tool_kind: Some("presentation".into()),
+                title: "Persistent conversation".into(),
+            },
+        )
         .await
         .expect("conversation should be created");
     service
         .append_message(
-            "owner-1",
+            &revue_office_lib::application::identity::Actor::user("owner-1"),
             &conversation.id,
             ConversationMessage {
                 role: "user".into(),
@@ -73,7 +76,7 @@ async fn restores_messages_and_legacy_artifacts_after_reconnecting() {
         .expect("message should be stored");
     service
         .replace_legacy_artifacts(
-            "owner-1",
+            &revue_office_lib::application::identity::Actor::user("owner-1"),
             &conversation.id,
             vec![ConversationArtifact {
                 id: "artifact-1".into(),
@@ -89,6 +92,14 @@ async fn restores_messages_and_legacy_artifacts_after_reconnecting() {
         )
         .await
         .expect("legacy artifact payload should be stored");
+    let mut other = revue_office_lib::application::identity::Actor::user("other-owner");
+    other.roles = vec!["admin".into()]; // Existing ownership policy is unchanged.
+    assert!(matches!(
+        service.detail(&other, &conversation.id).await,
+        Err(revue_office_lib::application::conversations::SessionApplicationError::Forbidden)
+    ));
+    assert!(!service.delete(&other, &conversation.id).await.unwrap());
+    assert!(!service.clear(&other, &conversation.id).await.unwrap());
     drop(service);
 
     let reopened = Arc::new(
@@ -98,7 +109,10 @@ async fn restores_messages_and_legacy_artifacts_after_reconnecting() {
     );
     let reopened_service = SessionApplicationService::new(reopened);
     let detail = reopened_service
-        .detail("owner-1", &conversation.id)
+        .detail(
+            &revue_office_lib::application::identity::Actor::user("owner-1"),
+            &conversation.id,
+        )
         .await
         .expect("conversation should be restored");
 

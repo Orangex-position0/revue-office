@@ -1,10 +1,10 @@
 use std::sync::Arc;
 
-use revue_office_lib::application::artifact_service::ArtifactService;
-use revue_office_lib::contracts::artifact::{ArtifactDraft, ArtifactPublicationStatus};
+use revue_office_lib::application::artifacts::{
+    ArtifactDraft, ArtifactPublicationRepository, ArtifactPublicationStatus, ArtifactService,
+};
 use revue_office_lib::infrastructure::filesystem::artifact_storage::LocalArtifactStorage;
 use revue_office_lib::infrastructure::persistence::sqlite::SqliteSessionRepository;
-use revue_office_lib::ports::repositories::artifact_publication::ArtifactPublicationRepository;
 
 #[tokio::test]
 async fn artifact_publish_success_promotes_validated_staging_file_before_ready() {
@@ -42,10 +42,12 @@ async fn artifact_publish_success_promotes_validated_staging_file_before_ready()
         tokio::fs::read(&final_path).await.unwrap(),
         b"valid presentation bytes"
     );
-    assert!(!root
-        .join("artifacts/staging")
-        .join(format!("{}.pptx", ready.id))
-        .exists());
+    assert!(
+        !root
+            .join("artifacts/staging")
+            .join(format!("{}.pptx", ready.id))
+            .exists()
+    );
     assert_eq!(ready.content["file_path"], final_path);
     assert_eq!(ready.content["file_size"], 24);
     assert!(repository.pending().await.unwrap().is_empty());

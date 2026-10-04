@@ -2,19 +2,13 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
-use revue_office_lib::application::artifact_service::ArtifactService;
-use revue_office_lib::contracts::artifact::{
-    ArtifactDraft, ArtifactFinalization, ArtifactPublication, ArtifactPublicationStatus,
-    NewArtifactPublication,
+use revue_office_lib::application::artifacts::{
+    ArtifactDraft, ArtifactFinalization, ArtifactPublication, ArtifactPublicationRepository,
+    ArtifactPublicationRepositoryError, ArtifactPublicationStatus, ArtifactService, FileStorage,
+    FileStorageError, NewArtifactPublication, ReadyArtifactFile, StagedArtifactFile,
 };
 use revue_office_lib::infrastructure::filesystem::artifact_storage::LocalArtifactStorage;
 use revue_office_lib::infrastructure::persistence::sqlite::SqliteSessionRepository;
-use revue_office_lib::ports::file_storage::{
-    FileStorage, FileStorageError, ReadyArtifactFile, StagedArtifactFile,
-};
-use revue_office_lib::ports::repositories::artifact_publication::{
-    ArtifactPublicationRepository, ArtifactPublicationRepositoryError,
-};
 
 #[derive(Clone, Copy)]
 enum FailurePoint {
@@ -106,6 +100,7 @@ fn io_error(stage: &str) -> FileStorageError {
 struct FinalizationFailureRepository {
     inner: Arc<SqliteSessionRepository>,
     last_id: Arc<Mutex<Option<String>>>,
+    fail_reserve: bool,
 }
 
 #[async_trait]
@@ -115,6 +110,11 @@ impl ArtifactPublicationRepository for FinalizationFailureRepository {
         publication: NewArtifactPublication,
     ) -> Result<ArtifactPublication, ArtifactPublicationRepositoryError> {
         *self.last_id.lock().unwrap() = Some(publication.id.clone());
+        if self.fail_reserve {
+            return Err(ArtifactPublicationRepositoryError::Unavailable(
+                anyhow::anyhow!("injected reserve failure"),
+            ));
+        }
         self.inner.reserve(publication).await
     }
 
@@ -202,6 +202,30 @@ async fn artifact_failure_reconciliation_marks_each_storage_failure_without_read
 }
 
 #[tokio::test]
+async fn artifact_failure_reconciliation_reserve_failure_writes_no_files() {
+    let root =
+        std::env::temp_dir().join(format!("revue-artifact-reserve-{}", uuid::Uuid::new_v4()));
+    std::fs::create_dir_all(&root).unwrap();
+    let repository = repository(&root).await;
+    let service = ArtifactService::new(
+        Arc::new(FinalizationFailureRepository {
+            inner: repository.clone(),
+            last_id: Arc::new(Mutex::new(None)),
+            fail_reserve: true,
+        }),
+        Arc::new(LocalArtifactStorage::new(root.join("files"))),
+    );
+
+    assert!(service.publish(draft("reserve failure")).await.is_err());
+    assert!(!root.join("files").exists());
+    assert!(repository.pending().await.unwrap().is_empty());
+
+    drop(service);
+    drop(repository);
+    let _ = std::fs::remove_dir_all(root);
+}
+
+#[tokio::test]
 async fn artifact_failure_reconciliation_compensates_finalize_failure() {
     let root =
         std::env::temp_dir().join(format!("revue-artifact-finalize-{}", uuid::Uuid::new_v4()));
@@ -212,6 +236,7 @@ async fn artifact_failure_reconciliation_compensates_finalize_failure() {
         Arc::new(FinalizationFailureRepository {
             inner: repository.clone(),
             last_id: last_id.clone(),
+            fail_reserve: false,
         }),
         Arc::new(LocalArtifactStorage::new(root.join("files"))),
     );
@@ -220,11 +245,13 @@ async fn artifact_failure_reconciliation_compensates_finalize_failure() {
     let id = last_id.lock().unwrap().clone().unwrap();
     let publication = repository.find(&id).await.unwrap().unwrap();
     assert_eq!(publication.status, ArtifactPublicationStatus::Failed);
-    assert!(!root
-        .join("files/ready")
-        .read_dir()
-        .map(|mut files| files.next().is_some())
-        .unwrap_or(false));
+    assert!(
+        !root
+            .join("files/ready")
+            .read_dir()
+            .map(|mut files| files.next().is_some())
+            .unwrap_or(false)
+    );
     drop(service);
     drop(repository);
     let _ = std::fs::remove_dir_all(root);

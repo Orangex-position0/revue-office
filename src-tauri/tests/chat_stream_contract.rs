@@ -1,5 +1,5 @@
+use revue_office_lib::application::artifacts::{ArtifactPublication, ArtifactPublicationStatus};
 use revue_office_lib::application::event::ApplicationEvent;
-use revue_office_lib::contracts::artifact::{ArtifactPublication, ArtifactPublicationStatus};
 use revue_office_lib::transport::sse::application_event_frame;
 
 fn ready_artifact() -> ArtifactPublication {

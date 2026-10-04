@@ -1,11 +1,11 @@
 use std::sync::Arc;
 
-use revue_office_lib::contracts::artifact::{
-    ArtifactFinalization, ArtifactPublicationStatus, NewArtifactPublication,
+use revue_office_lib::application::artifacts::{
+    ArtifactFinalization, ArtifactPublicationRepository, ArtifactPublicationStatus,
+    NewArtifactPublication,
 };
 use revue_office_lib::infrastructure::persistence::mysql::MySqlSessionRepository;
 use revue_office_lib::infrastructure::persistence::sqlite::SqliteSessionRepository;
-use revue_office_lib::ports::repositories::artifact_publication::ArtifactPublicationRepository;
 
 async fn exercise_repository(repository: Arc<dyn ArtifactPublicationRepository>) {
     let ready_candidate = repository
@@ -53,10 +53,12 @@ async fn exercise_repository(repository: Arc<dyn ArtifactPublicationRepository>)
         })
         .await
         .expect("second publication should be reserved");
-    assert!(repository
-        .fail(&failed_candidate.id, "render failed")
-        .await
-        .expect("publication should fail"));
+    assert!(
+        repository
+            .fail(&failed_candidate.id, "render failed")
+            .await
+            .expect("publication should fail")
+    );
     let failed = repository
         .find(&failed_candidate.id)
         .await

@@ -1,99 +1,73 @@
-use std::collections::{BTreeSet, HashSet};
+use std::collections::BTreeSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use axum::response::IntoResponse;
 use syn::visit::Visit;
 use syn::{File, ItemUse, Path as SynPath, UseTree};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum Layer {
-    Contract,
-    Port,
-    Capability,
+enum Subsystem {
+    Providers,
+    AgentCore,
     Agent,
+    Capabilities,
     Application,
-    Transport,
     Infrastructure,
-    App,
+    Transport,
+    Bootstrap,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-struct AllowEntry {
-    file: &'static str,
-    dependency: &'static str,
-    reason: &'static str,
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Role {
+    Facade,
+    ContractModel,
+    ConsumerPort,
+    Service,
+    Adapter,
+    Transport,
+    CompositionRoot,
 }
 
-// Only HTTP modules not yet migrated to Application Services may bypass the
-// Transport -> legacy persistence rule. Migrated chat/session files are absent.
-const LEGACY_ALLOWLIST: &[AllowEntry] = &[
-    AllowEntry {
-        file: "routes/auth.rs",
-        dependency: "crate::db",
-        reason: "authentication migration is outside this slice",
-    },
-    AllowEntry {
-        file: "routes/auth.rs",
-        dependency: "crate::state",
-        reason: "authentication migration is outside this slice",
-    },
-    AllowEntry {
-        file: "routes/dashboard.rs",
-        dependency: "crate::db",
-        reason: "dashboard migration is outside this slice",
-    },
-    AllowEntry {
-        file: "routes/dashboard.rs",
-        dependency: "crate::state",
-        reason: "dashboard migration is outside this slice",
-    },
-    AllowEntry {
-        file: "routes/file.rs",
-        dependency: "crate::db",
-        reason: "file API migration is outside this slice",
-    },
-    AllowEntry {
-        file: "routes/file.rs",
-        dependency: "crate::state",
-        reason: "file API migration is outside this slice",
-    },
-    AllowEntry {
-        file: "routes/notification.rs",
-        dependency: "crate::db",
-        reason: "notification migration is outside this slice",
-    },
-    AllowEntry {
-        file: "routes/notification.rs",
-        dependency: "crate::state",
-        reason: "notification migration is outside this slice",
-    },
-    AllowEntry {
-        file: "routes/project.rs",
-        dependency: "crate::db",
-        reason: "project API migration is outside this slice",
-    },
-    AllowEntry {
-        file: "routes/project.rs",
-        dependency: "crate::state",
-        reason: "project API migration is outside this slice",
-    },
-    AllowEntry {
-        file: "routes/settings.rs",
-        dependency: "crate::db",
-        reason: "settings migration is outside this slice",
-    },
-    AllowEntry {
-        file: "routes/settings.rs",
-        dependency: "crate::state",
-        reason: "settings migration is outside this slice",
-    },
+const LEGACY_ALLOWLIST: &[(&str, &str)] = &[];
+const LEGACY_ROOTS: &[&str] = &[
+    "app.rs",
+    "app",
+    "routes.rs",
+    "routes",
+    "db.rs",
+    "db",
+    "models.rs",
+    "contracts",
+    "ports",
+    "state.rs",
+    "config.rs",
+    "auth.rs",
+    "auth",
+    "llm.rs",
+    "llm",
+    "error.rs",
+    "commands.rs",
+    "files.rs",
+];
+const LEGACY_PATHS: &[&str] = &[
+    "crate::app",
+    "crate::routes",
+    "crate::db",
+    "crate::models",
+    "crate::contracts",
+    "crate::ports",
+    "crate::state",
+    "crate::config",
+    "crate::llm",
 ];
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct Violation {
     file: String,
     dependency: String,
-    layer: Layer,
+    subsystem: Subsystem,
+    role: Role,
 }
 
 #[derive(Default)]
@@ -151,125 +125,166 @@ fn collect_use_tree(tree: &UseTree, prefix: Vec<String>, paths: &mut BTreeSet<St
     }
 }
 
-fn forbidden(layer: Layer) -> &'static [&'static str] {
-    match layer {
-        Layer::Contract => &[
+fn dependency_matches(path: &str, dependency: &str) -> bool {
+    path == dependency || path.starts_with(&format!("{dependency}::"))
+}
+
+fn classify(relative: &str) -> Option<(Subsystem, Role)> {
+    let subsystem = match relative.split('/').next()? {
+        "providers.rs" | "providers" => Subsystem::Providers,
+        "agent_core.rs" | "agent_core" => Subsystem::AgentCore,
+        "agent.rs" | "agent" => Subsystem::Agent,
+        "capabilities.rs" | "capabilities" => Subsystem::Capabilities,
+        "application.rs" | "application" => Subsystem::Application,
+        "infrastructure.rs" | "infrastructure" => Subsystem::Infrastructure,
+        "transport.rs" | "transport" => Subsystem::Transport,
+        "bootstrap.rs" | "bootstrap" => Subsystem::Bootstrap,
+        _ => return None,
+    };
+    let filename = relative.rsplit('/').next().unwrap_or(relative);
+    let role = if !relative.contains('/') {
+        Role::Facade
+    } else if subsystem == Subsystem::Bootstrap {
+        Role::CompositionRoot
+    } else if subsystem == Subsystem::Transport {
+        Role::Transport
+    } else if subsystem == Subsystem::Infrastructure
+        || relative.starts_with("providers/api/")
+        || relative.starts_with("providers/builtin/")
+        || relative == "providers/client.rs"
+    {
+        Role::Adapter
+    } else if filename == "ports.rs" {
+        Role::ConsumerPort
+    } else if matches!(filename, "model.rs" | "error.rs" | "event.rs" | "types.rs") {
+        Role::ContractModel
+    } else {
+        Role::Service
+    };
+    Some((subsystem, role))
+}
+
+fn denied_dependencies(subsystem: Subsystem, role: Role) -> &'static [&'static str] {
+    match subsystem {
+        Subsystem::Providers if role != Role::Adapter => &[
             "axum",
             "tauri",
             "sqlx",
-            "crate::app",
-            "crate::application",
+            "reqwest",
             "crate::agent",
+            "crate::agent_core",
+            "crate::application",
             "crate::capabilities",
             "crate::infrastructure",
-            "crate::ports",
-            "crate::routes",
             "crate::transport",
-            "crate::db",
-            "crate::state",
+            "crate::bootstrap",
         ],
-        Layer::Port => &[
+        Subsystem::Providers => &[
             "axum",
             "tauri",
             "sqlx",
-            "crate::app",
-            "crate::application",
             "crate::agent",
+            "crate::agent_core",
+            "crate::application",
             "crate::capabilities",
             "crate::infrastructure",
-            "crate::routes",
             "crate::transport",
-            "crate::db",
-            "crate::state",
+            "crate::bootstrap",
         ],
-        Layer::Capability => &[
+        Subsystem::AgentCore => &[
             "axum",
             "tauri",
             "sqlx",
-            "crate::app",
-            "crate::application",
+            "reqwest",
             "crate::agent",
+            "crate::application",
+            "crate::capabilities",
             "crate::infrastructure",
-            "crate::routes",
             "crate::transport",
-            "crate::db",
-            "crate::state",
+            "crate::bootstrap",
         ],
-        Layer::Agent => &[
+        Subsystem::Agent => &[
             "axum",
             "tauri",
             "sqlx",
-            "crate::app",
             "crate::application",
             "crate::infrastructure",
-            "crate::routes",
             "crate::transport",
-            "crate::db",
-            "crate::state",
+            "crate::bootstrap",
         ],
-        Layer::Application => &[
+        Subsystem::Capabilities => &[
             "axum",
             "tauri",
             "sqlx",
-            "crate::app",
+            "reqwest",
+            "crate::agent",
+            "crate::application",
             "crate::infrastructure",
-            "crate::routes",
             "crate::transport",
-            "crate::db",
-            "crate::state",
+            "crate::bootstrap",
         ],
-        Layer::Transport => &[
+        Subsystem::Application => &[
+            "axum",
+            "tauri",
             "sqlx",
-            "crate::infrastructure::persistence",
-            "crate::db",
-            "crate::state",
-            "crate::agent::event",
-            "crate::agent::runtime",
+            "reqwest",
+            "jsonwebtoken",
+            "bcrypt",
+            "crate::infrastructure",
+            "crate::transport",
+            "crate::bootstrap",
         ],
-        Layer::Infrastructure => &["crate::application", "crate::routes", "crate::transport"],
-        Layer::App => &[],
+        Subsystem::Infrastructure => &["axum", "tauri", "crate::transport", "crate::bootstrap"],
+        Subsystem::Transport => &[
+            "sqlx",
+            "reqwest",
+            "crate::bootstrap",
+            "crate::infrastructure",
+            "crate::agent::tools",
+            "crate::providers::api",
+            "crate::providers::builtin",
+        ],
+        Subsystem::Bootstrap => &[],
     }
 }
 
-fn dependency_matches(path: &str, forbidden: &str) -> bool {
-    path == forbidden || path.starts_with(&format!("{forbidden}::"))
+fn infrastructure_service_dependency(path: &str) -> bool {
+    path == "crate::application::chat_service::ChatApplicationService"
+        || path.ends_with("ApplicationService")
+        || path.contains("::service::")
 }
 
-fn analyze_source(layer: Layer, file: &str, source: &str) -> Result<Vec<Violation>, String> {
+fn analyze_source(
+    subsystem: Subsystem,
+    role: Role,
+    file: &str,
+    source: &str,
+) -> Result<Vec<Violation>, String> {
     let syntax: File = syn::parse_file(source).map_err(|error| format!("{file}: {error}"))?;
     let mut collector = PathCollector::default();
     collector.visit_file(&syntax);
-    let mut violations = BTreeSet::new();
+    let mut dependencies = BTreeSet::new();
     for path in collector.paths {
-        for denied in forbidden(layer) {
-            if dependency_matches(&path, denied) {
-                violations.insert((path.clone(), *denied));
-            }
+        let denied = denied_dependencies(subsystem, role)
+            .iter()
+            .any(|dependency| dependency_matches(&path, dependency));
+        let denied = denied
+            || (subsystem == Subsystem::Infrastructure
+                && dependency_matches(&path, "crate::application")
+                && infrastructure_service_dependency(&path));
+        if denied {
+            dependencies.insert(path);
         }
     }
-    Ok(violations
+    Ok(dependencies
         .into_iter()
-        .map(|(dependency, _)| Violation {
+        .map(|dependency| Violation {
             file: file.into(),
             dependency,
-            layer,
+            subsystem,
+            role,
         })
         .collect())
-}
-
-fn layer_for(relative: &str) -> Option<Layer> {
-    let first = relative.split('/').next()?;
-    match first {
-        "contracts" => Some(Layer::Contract),
-        "ports" => Some(Layer::Port),
-        "capabilities" => Some(Layer::Capability),
-        "agent" => Some(Layer::Agent),
-        "application" => Some(Layer::Application),
-        "transport" | "routes" => Some(Layer::Transport),
-        "infrastructure" => Some(Layer::Infrastructure),
-        "app" => Some(Layer::App),
-        _ => None,
-    }
 }
 
 fn rust_files(root: &Path) -> Vec<PathBuf> {
@@ -290,65 +305,30 @@ fn rust_files(root: &Path) -> Vec<PathBuf> {
 }
 
 #[test]
-fn architecture_boundaries_enforce_dependency_matrix_and_exact_legacy_allowlist() {
+fn architecture_boundaries_enforce_subsystem_and_role_matrix_without_allowlist() {
+    assert!(LEGACY_ALLOWLIST.is_empty());
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("src");
     let mut violations = Vec::new();
-    let mut used_allowlist = HashSet::new();
-
     for path in rust_files(&root) {
         let relative = path
             .strip_prefix(&root)
             .unwrap()
             .to_string_lossy()
             .replace('\\', "/");
-        let Some(layer) = layer_for(&relative) else {
+        let Some((subsystem, role)) = classify(&relative) else {
             continue;
         };
         let source = fs::read_to_string(&path).unwrap();
-        for violation in analyze_source(layer, &relative, &source).unwrap() {
-            let allowed = LEGACY_ALLOWLIST.iter().find(|entry| {
-                entry.file == relative
-                    && dependency_matches(&violation.dependency, entry.dependency)
-            });
-            if let Some(entry) = allowed {
-                assert!(
-                    !entry.reason.trim().is_empty(),
-                    "allowlist reason is required"
-                );
-                used_allowlist.insert((entry.file, entry.dependency));
-            } else {
-                violations.push(violation);
-            }
-        }
+        violations.extend(analyze_source(subsystem, role, &relative, &source).unwrap());
     }
-
-    let stale = LEGACY_ALLOWLIST
-        .iter()
-        .filter(|entry| !used_allowlist.contains(&(entry.file, entry.dependency)))
-        .map(|entry| format!("{} -> {}", entry.file, entry.dependency))
-        .collect::<Vec<_>>();
-    assert!(
-        stale.is_empty(),
-        "stale architecture allowlist entries:\n{}",
-        stale.join("\n")
-    );
-    assert!(
-        !LEGACY_ALLOWLIST.iter().any(|entry| {
-            matches!(entry.file, "routes/chat.rs" | "routes/session.rs")
-                || entry.file.starts_with("transport/")
-                || entry.file.starts_with("application/")
-                || entry.file.starts_with("capabilities/")
-        }),
-        "migrated files must not appear in the architecture allowlist"
-    );
     assert!(
         violations.is_empty(),
         "architecture boundary violations:\n{}",
         violations
             .iter()
-            .map(|violation| format!(
-                "{} ({:?}) -> {}",
-                violation.file, violation.layer, violation.dependency
+            .map(|item| format!(
+                "{} ({:?}/{:?}) -> {}",
+                item.file, item.subsystem, item.role, item.dependency
             ))
             .collect::<Vec<_>>()
             .join("\n")
@@ -356,54 +336,280 @@ fn architecture_boundaries_enforce_dependency_matrix_and_exact_legacy_allowlist(
 }
 
 #[test]
-fn architecture_boundaries_rule_engine_detects_alias_multiline_and_full_paths() {
-    let alias_and_multiline = r#"
-        use crate::infrastructure::{
-            persistence as storage,
-        };
-        fn load() { let _ = storage::load(); }
-    "#;
-    let transport = analyze_source(Layer::Transport, "fixture.rs", alias_and_multiline).unwrap();
-    assert!(transport.iter().any(|violation| {
-        dependency_matches(&violation.dependency, "crate::infrastructure::persistence")
+fn architecture_rule_engine_detects_alias_grouped_multiline_and_full_paths() {
+    let alias = r#"use crate::infrastructure::{persistence as storage};"#;
+    let violations =
+        analyze_source(Subsystem::Transport, Role::Transport, "fixture.rs", alias).unwrap();
+    assert!(violations.iter().any(|item| {
+        dependency_matches(&item.dependency, "crate::infrastructure::persistence")
     }));
 
     let full_path = r#"fn load() { let _ = sqlx::query("SELECT 1"); }"#;
-    let capability = analyze_source(Layer::Capability, "fixture.rs", full_path).unwrap();
-    assert!(capability
-        .iter()
-        .any(|violation| dependency_matches(&violation.dependency, "sqlx")));
-
-    let agent_framework = r#"use axum::{extract::State, response::Response};"#;
-    assert!(!analyze_source(Layer::Agent, "fixture.rs", agent_framework)
+    assert!(
+        !analyze_source(
+            Subsystem::Application,
+            Role::Service,
+            "fixture.rs",
+            full_path,
+        )
         .unwrap()
-        .is_empty());
+        .is_empty()
+    );
 
-    let agent_adapter =
-        r#"use crate::infrastructure::llm::presentation::ConfiguredPresentationLlm;"#;
-    assert!(!analyze_source(Layer::Agent, "fixture.rs", agent_adapter)
-        .unwrap()
-        .is_empty());
-
-    let infrastructure_application =
-        r#"use crate::application::artifact_service::ArtifactService;"#;
-    assert!(!analyze_source(
-        Layer::Infrastructure,
-        "fixture.rs",
-        infrastructure_application,
-    )
-    .unwrap()
-    .is_empty());
+    let grouped =
+        r#"use crate::{application::chat_service::ChatApplicationService, transport::Http};"#;
+    assert!(
+        analyze_source(Subsystem::AgentCore, Role::Service, "fixture.rs", grouped,)
+            .unwrap()
+            .len()
+            >= 2
+    );
 }
 
 #[test]
-fn architecture_boundaries_rule_engine_accepts_allowed_direction() {
-    let source = r#"
-        use crate::contracts::presentation::{PresentationPlan, PresentationProgress};
-        use crate::ports::llm::PresentationLlm;
-        fn plan(_: &dyn PresentationLlm) -> Option<PresentationPlan> { None }
+fn architecture_rule_engine_accepts_consumer_owned_ports_and_composition_root() {
+    let adapter = r#"
+        use crate::application::assets::{Asset, AssetRepository};
+        use crate::application::identity::{Account, AccountRepository};
     "#;
-    assert!(analyze_source(Layer::Capability, "fixture.rs", source)
+    assert!(
+        analyze_source(
+            Subsystem::Infrastructure,
+            Role::Adapter,
+            "fixture.rs",
+            adapter,
+        )
         .unwrap()
-        .is_empty());
+        .is_empty()
+    );
+
+    let service = r#"use crate::application::assets::AssetApplicationService;"#;
+    assert!(
+        !analyze_source(
+            Subsystem::Infrastructure,
+            Role::Adapter,
+            "fixture.rs",
+            service,
+        )
+        .unwrap()
+        .is_empty()
+    );
+
+    let bootstrap = r#"
+        use crate::{application::chat_service::ChatApplicationService, infrastructure::identity::AuthEndpoints};
+    "#;
+    assert!(
+        analyze_source(
+            Subsystem::Bootstrap,
+            Role::CompositionRoot,
+            "fixture.rs",
+            bootstrap,
+        )
+        .unwrap()
+        .is_empty()
+    );
+}
+
+#[test]
+fn final_source_tree_has_only_approved_roots_and_no_mod_rs_or_global_service_state() {
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("src");
+    let mod_files = rust_files(&root)
+        .into_iter()
+        .filter(|path| path.file_name().and_then(|value| value.to_str()) == Some("mod.rs"))
+        .collect::<Vec<_>>();
+    assert!(mod_files.is_empty(), "mod.rs remains: {mod_files:?}");
+
+    for legacy in LEGACY_ROOTS {
+        assert!(!root.join(legacy).exists(), "legacy root remains: {legacy}");
+    }
+    let allowed_roots = [
+        "agent",
+        "agent.rs",
+        "agent_core",
+        "agent_core.rs",
+        "application",
+        "application.rs",
+        "bootstrap",
+        "bootstrap.rs",
+        "capabilities",
+        "capabilities.rs",
+        "infrastructure",
+        "infrastructure.rs",
+        "providers",
+        "providers.rs",
+        "transport",
+        "transport.rs",
+        "lib.rs",
+        "main.rs",
+    ];
+    for entry in fs::read_dir(&root).unwrap() {
+        let name = entry.unwrap().file_name().to_string_lossy().into_owned();
+        assert!(
+            allowed_roots.contains(&name.as_str()),
+            "unexpected crate root: {name}"
+        );
+    }
+    for forbidden in [
+        "common",
+        "common.rs",
+        "shared",
+        "shared.rs",
+        "utils",
+        "utils.rs",
+    ] {
+        assert!(
+            !root.join(forbidden).exists(),
+            "generic root added: {forbidden}"
+        );
+    }
+
+    for path in rust_files(&root) {
+        let source = fs::read_to_string(&path).unwrap();
+        let syntax = syn::parse_file(&source).unwrap();
+        let mut collector = PathCollector::default();
+        collector.visit_file(&syntax);
+        for legacy in LEGACY_PATHS {
+            assert!(
+                !collector
+                    .paths
+                    .iter()
+                    .any(|path| dependency_matches(path, legacy)),
+                "{} still references {legacy}",
+                path.display()
+            );
+        }
+        assert!(
+            !source.contains("AnyPool"),
+            "{} uses AnyPool",
+            path.display()
+        );
+        assert!(
+            !source.contains("OnceLock"),
+            "{} uses global OnceLock state",
+            path.display()
+        );
+    }
+}
+
+#[tokio::test]
+async fn http_error_wire_contract_is_stable_and_internal_details_are_redacted() {
+    use revue_office_lib::transport::http::error::AppError;
+
+    async fn response(error: AppError) -> (axum::http::StatusCode, serde_json::Value) {
+        let response = error.into_response();
+        let status = response.status();
+        let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        (status, serde_json::from_slice(&bytes).unwrap())
+    }
+
+    assert_eq!(
+        response(AppError::Unauthorized).await,
+        (
+            axum::http::StatusCode::UNAUTHORIZED,
+            serde_json::json!({"detail":"未认证"})
+        )
+    );
+    assert_eq!(
+        response(AppError::Forbidden).await,
+        (
+            axum::http::StatusCode::FORBIDDEN,
+            serde_json::json!({"detail":"无权访问"})
+        )
+    );
+    assert_eq!(
+        response(AppError::BadRequest("输入无效".into())).await,
+        (
+            axum::http::StatusCode::BAD_REQUEST,
+            serde_json::json!({"detail":"参数错误: 输入无效"})
+        )
+    );
+    assert_eq!(
+        response(AppError::NotFound("会话不存在".into())).await,
+        (
+            axum::http::StatusCode::NOT_FOUND,
+            serde_json::json!({"detail":"未找到: 会话不存在"})
+        )
+    );
+    assert_eq!(
+        response(AppError::Internal(anyhow::anyhow!(
+            "SELECT secret FROM users"
+        )))
+        .await,
+        (
+            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+            serde_json::json!({"detail":"内部错误"})
+        )
+    );
+}
+
+#[test]
+fn office_agent_registry_and_http_state_remain_instance_scoped() {
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("src");
+    let agent = fs::read_to_string(root.join("agent/tools.rs")).unwrap();
+    let state = fs::read_to_string(root.join("transport/http/state.rs")).unwrap();
+    let bootstrap = fs::read_to_string(root.join("bootstrap.rs")).unwrap();
+    assert!(!agent.contains("static REGISTRY"));
+    assert!(!agent.contains("Lazy<ToolRegistry"));
+    for forbidden in [
+        "SqlitePool",
+        "MySqlPool",
+        "Repository",
+        "CredentialStore",
+        "ToolRegistry",
+    ] {
+        assert!(!state.contains(forbidden), "HttpState exposes {forbidden}");
+    }
+    assert!(bootstrap.contains("infrastructure::build_identity"));
+    assert!(bootstrap.contains("application::build"));
+    assert!(bootstrap.contains("http::build"));
+}
+
+#[test]
+fn credential_and_tool_helpers_have_no_plaintext_or_legacy_config_fallback() {
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("src");
+    let config = fs::read_to_string(root.join("bootstrap/config.rs")).unwrap();
+    for field in [
+        "pub llm_api_key:",
+        "pub llm_api_keys:",
+        "pub llm_text_api_key:",
+        "pub llm_image_api_key:",
+        "pub llm_video_api_key:",
+        "pub baidu_mcp_api_key:",
+    ] {
+        assert!(!config.contains(field));
+    }
+    let helper = fs::read_to_string(root.join("agent/tools/chat_provider.rs")).unwrap();
+    for forbidden in [
+        "crate::config",
+        "crate::state",
+        "crate::db",
+        "bearer_auth",
+        "API_KEY_ROUND_ROBIN",
+    ] {
+        assert!(
+            !helper.contains(forbidden),
+            "Tool helper contains {forbidden}"
+        );
+    }
+    assert!(helper.contains("provider_resolver"));
+    let selector = fs::read_to_string(root.join("bootstrap/providers.rs")).unwrap();
+    assert!(selector.contains("credentials.revision()"));
+    assert!(!selector.contains("keys.hash"));
+}
+
+#[test]
+fn presentation_capability_owns_renderer_models_and_ports() {
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("src");
+    let capability = fs::read_to_string(root.join("capabilities/presentation/model.rs")).unwrap();
+    let renderer = fs::read_to_string(root.join("infrastructure/export/pptx.rs")).unwrap();
+    let export = fs::read_to_string(root.join("infrastructure/export.rs")).unwrap();
+    assert!(capability.contains("pub struct PresentationProject"));
+    assert!(renderer.contains("PresentationProject"));
+    assert!(renderer.contains("PresentationSlide"));
+    assert!(renderer.contains("PresentationElement"));
+    assert!(!renderer.contains("crate::models"));
+    assert!(!export.contains("legacy_project"));
+    assert!(!export.contains("serde_json::to_value(project)"));
 }

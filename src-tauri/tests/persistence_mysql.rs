@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
-use revue_office_lib::application::session_service::SessionApplicationService;
-use revue_office_lib::contracts::conversation::{
+use revue_office_lib::application::conversations::SessionApplicationService;
+use revue_office_lib::application::conversations::model::{
     ConversationArtifact, ConversationMessage, ConversationUpdate, NewConversation,
 };
 use revue_office_lib::infrastructure::persistence::mysql::MySqlSessionRepository;
@@ -58,17 +58,20 @@ async fn mysql_session_repository_matches_the_sqlite_application_contract() {
 
     let service = SessionApplicationService::new(repository);
     let conversation = service
-        .create(NewConversation {
-            owner_id: owner_id.clone(),
-            project_id: None,
-            tool_kind: Some("general".into()),
-            title: "MySQL conversation".into(),
-        })
+        .create(
+            &revue_office_lib::application::identity::Actor::user(&owner_id),
+            NewConversation {
+                owner_id: owner_id.clone(),
+                project_id: None,
+                tool_kind: Some("general".into()),
+                title: "MySQL conversation".into(),
+            },
+        )
         .await
         .expect("conversation should be created");
     service
         .append_message(
-            &owner_id,
+            &revue_office_lib::application::identity::Actor::user(&owner_id),
             &conversation.id,
             ConversationMessage {
                 role: "user".into(),
@@ -82,7 +85,7 @@ async fn mysql_session_repository_matches_the_sqlite_application_contract() {
         .expect("message should be appended");
     service
         .replace_legacy_artifacts(
-            &owner_id,
+            &revue_office_lib::application::identity::Actor::user(&owner_id),
             &conversation.id,
             vec![ConversationArtifact {
                 id: "artifact-1".into(),
@@ -100,7 +103,7 @@ async fn mysql_session_repository_matches_the_sqlite_application_contract() {
         .expect("legacy artifacts should be persisted");
     service
         .update(
-            &owner_id,
+            &revue_office_lib::application::identity::Actor::user(&owner_id),
             &conversation.id,
             ConversationUpdate {
                 title: Some("Renamed MySQL conversation".into()),
@@ -119,7 +122,10 @@ async fn mysql_session_repository_matches_the_sqlite_application_contract() {
     );
     let reopened_service = SessionApplicationService::new(reopened);
     let detail = reopened_service
-        .detail(&owner_id, &conversation.id)
+        .detail(
+            &revue_office_lib::application::identity::Actor::user(&owner_id),
+            &conversation.id,
+        )
         .await
         .expect("conversation should survive restart");
 
@@ -130,27 +136,36 @@ async fn mysql_session_repository_matches_the_sqlite_application_contract() {
     assert_eq!(detail.artifacts.len(), 1);
     assert_eq!(detail.artifacts[0].title, "Existing artifact");
 
+    let actor = revue_office_lib::application::identity::Actor::user(&owner_id);
     let listed = reopened_service
-        .list(&owner_id, 20, Some("Renamed"))
+        .list(&actor, 20, Some("Renamed"))
         .await
         .expect("conversation should be listed");
     assert_eq!(listed.len(), 1);
-    assert!(reopened_service
-        .clear(&owner_id, &conversation.id)
-        .await
-        .expect("messages should be cleared"));
-    assert!(reopened_service
-        .messages(&owner_id, &conversation.id, 100)
-        .await
-        .expect("history should remain readable")
-        .is_empty());
-    assert!(reopened_service
-        .delete(&owner_id, &conversation.id)
-        .await
-        .expect("conversation should be deleted"));
-    assert!(reopened_service
-        .list(&owner_id, 20, None)
-        .await
-        .expect("empty list should remain readable")
-        .is_empty());
+    assert!(
+        reopened_service
+            .clear(&actor, &conversation.id)
+            .await
+            .expect("messages should be cleared")
+    );
+    assert!(
+        reopened_service
+            .messages(&actor, &conversation.id, 100)
+            .await
+            .expect("history should remain readable")
+            .is_empty()
+    );
+    assert!(
+        reopened_service
+            .delete(&actor, &conversation.id)
+            .await
+            .expect("conversation should be deleted")
+    );
+    assert!(
+        reopened_service
+            .list(&actor, 20, None)
+            .await
+            .expect("empty list should remain readable")
+            .is_empty()
+    );
 }
