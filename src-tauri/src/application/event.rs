@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::contracts::artifact::ArtifactPublication;
+use super::artifacts::ArtifactPublication;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]

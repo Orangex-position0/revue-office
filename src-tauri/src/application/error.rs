@@ -1,6 +1,6 @@
 use thiserror::Error;
 
-use crate::ports::repositories::session::SessionRepositoryError;
+use crate::application::conversations::SessionRepositoryError;
 
 #[derive(Debug, Error)]
 pub enum ChatApplicationError {

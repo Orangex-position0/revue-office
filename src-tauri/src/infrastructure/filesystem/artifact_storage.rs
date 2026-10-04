@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use async_trait::async_trait;
 
-use crate::ports::file_storage::{
+use crate::application::artifacts::{
     FileStorage, FileStorageError, ReadyArtifactFile, StagedArtifactFile,
 };
 

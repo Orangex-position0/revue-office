@@ -2,9 +2,8 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
+use super::chat_provider::{ToolChatClient, ToolChatMessage};
 use crate::agent::tool::{OfficeTool, ToolArtifact, ToolContext, ToolResult};
-use crate::llm::LlmClient;
-use crate::models::ChatMessage;
 
 pub struct DocGenerateTool;
 
@@ -154,11 +153,21 @@ impl OfficeTool for DocGenerateTool {
         );
 
         let format_guide = match format.as_str() {
-            "report" => "生成一份正式分析报告，包含背景、现状分析、关键问题、数据或案例支撑、结论和建议，适合直接汇报或归档。",
-            "plan" => "生成一份可执行的工作计划，包含目标、范围、阶段安排、责任分工、资源需求、风险评估、验收标准。",
-            "summary" => "生成一份高质量总结材料，包含核心结论、关键数据、经验教训、问题反思、后续建议，适合复盘汇报。",
-            "article" => "生成一篇结构完整且有阅读价值的文章，包含引言、核心论述、案例或论据、总结，避免空泛套话。",
-            "prd" => "生成一份专业产品需求文档，包含背景、目标、用户与场景、功能设计、流程说明、优先级、非功能要求、验收标准。",
+            "report" => {
+                "生成一份正式分析报告，包含背景、现状分析、关键问题、数据或案例支撑、结论和建议，适合直接汇报或归档。"
+            }
+            "plan" => {
+                "生成一份可执行的工作计划，包含目标、范围、阶段安排、责任分工、资源需求、风险评估、验收标准。"
+            }
+            "summary" => {
+                "生成一份高质量总结材料，包含核心结论、关键数据、经验教训、问题反思、后续建议，适合复盘汇报。"
+            }
+            "article" => {
+                "生成一篇结构完整且有阅读价值的文章，包含引言、核心论述、案例或论据、总结，避免空泛套话。"
+            }
+            "prd" => {
+                "生成一份专业产品需求文档，包含背景、目标、用户与场景、功能设计、流程说明、优先级、非功能要求、验收标准。"
+            }
             _ => "生成一份结构完整的文档。",
         };
 
@@ -189,18 +198,25 @@ impl OfficeTool for DocGenerateTool {
 
         let user_prompt = format!(
             "请根据用户需求生成一份完整、专业、可直接交付的结构化文档。要求：{format_guide}\n场景偏好：{scene_guide}\n{}用户需求：{topic}",
-            if audience.is_empty() { String::new() } else { format!("目标读者：{audience}\n") }
+            if audience.is_empty() {
+                String::new()
+            } else {
+                format!("目标读者：{audience}\n")
+            }
         );
 
-        let client = LlmClient::for_user(&ctx.user_id, ctx.preferred_model.as_deref()).await;
+        let client = match ToolChatClient::for_context(ctx).await {
+            Ok(client) => client,
+            Err(_) => return ToolResult::err("模型服务暂不可用"),
+        };
         let messages = vec![
-            ChatMessage {
+            ToolChatMessage {
                 role: "system".into(),
                 content: system_prompt.into(),
                 tool_calls: None,
                 tool_call_id: None,
             },
-            ChatMessage {
+            ToolChatMessage {
                 role: "user".into(),
                 content: user_prompt,
                 tool_calls: None,
@@ -219,7 +235,7 @@ impl OfficeTool for DocGenerateTool {
             .and_then(|c| c.message.content.as_deref())
             .unwrap_or("");
 
-        let doc: DocOutput = match LlmClient::extract_json(content)
+        let doc: DocOutput = match ToolChatClient::extract_json(content)
             .and_then(|v| serde_json::from_value::<DocOutput>(v).map_err(|e| anyhow::anyhow!(e)))
         {
             Ok(d) => d,

@@ -2,9 +2,8 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
+use super::chat_provider::{ToolChatClient, ToolChatMessage};
 use crate::agent::tool::{OfficeTool, ToolArtifact, ToolContext, ToolResult};
-use crate::llm::LlmClient;
-use crate::models::ChatMessage;
 
 pub struct ChartGenerateTool;
 
@@ -78,16 +77,21 @@ impl OfficeTool for ChartGenerateTool {
 - 如果用户没有给具体数据，补出合理示例数据，但要贴合业务场景
 - 不要输出占位符、解释文本或代码块"#;
 
-        let user_prompt = format!("用户想在对话中增强可视化体验，请生成一个可直接渲染的图表。\n用户需求：{topic}\n偏好图表类型：{preferred_type}");
-        let client = LlmClient::for_user(&ctx.user_id, ctx.preferred_model.as_deref()).await;
+        let user_prompt = format!(
+            "用户想在对话中增强可视化体验，请生成一个可直接渲染的图表。\n用户需求：{topic}\n偏好图表类型：{preferred_type}"
+        );
+        let client = match ToolChatClient::for_context(ctx).await {
+            Ok(client) => client,
+            Err(_) => return ToolResult::err("模型服务暂不可用"),
+        };
         let messages = vec![
-            ChatMessage {
+            ToolChatMessage {
                 role: "system".into(),
                 content: system_prompt.into(),
                 tool_calls: None,
                 tool_call_id: None,
             },
-            ChatMessage {
+            ToolChatMessage {
                 role: "user".into(),
                 content: user_prompt,
                 tool_calls: None,
@@ -105,7 +109,7 @@ impl OfficeTool for ChartGenerateTool {
             .and_then(|c| c.message.content.as_deref())
             .unwrap_or("");
 
-        let output: ChartOutput = match LlmClient::extract_json(content)
+        let output: ChartOutput = match ToolChatClient::extract_json(content)
             .and_then(|v| serde_json::from_value::<ChartOutput>(v).map_err(|e| anyhow::anyhow!(e)))
         {
             Ok(o) => o,

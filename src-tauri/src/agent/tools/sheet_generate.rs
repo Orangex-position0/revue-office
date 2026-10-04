@@ -2,9 +2,8 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
+use super::chat_provider::{ToolChatClient, ToolChatMessage};
 use crate::agent::tool::{OfficeTool, ToolArtifact, ToolContext, ToolResult};
-use crate::llm::LlmClient;
-use crate::models::ChatMessage;
 
 pub struct SheetGenerateTool;
 
@@ -140,17 +139,22 @@ impl OfficeTool for SheetGenerateTool {
 - 如果需求适合多表，生成多个 table，例如“明细表 + 汇总表”“计划表 + 风险表”
 - summary 要说明表格适合怎样使用或分析"#;
 
-        let user_prompt = format!("请根据用户需求生成结构化表格数据，结果要更接近真实业务表格，而不是演示占位数据。\n场景偏好：{scene_guide}\n用户需求：{topic}");
+        let user_prompt = format!(
+            "请根据用户需求生成结构化表格数据，结果要更接近真实业务表格，而不是演示占位数据。\n场景偏好：{scene_guide}\n用户需求：{topic}"
+        );
 
-        let client = LlmClient::for_user(&ctx.user_id, ctx.preferred_model.as_deref()).await;
+        let client = match ToolChatClient::for_context(ctx).await {
+            Ok(client) => client,
+            Err(_) => return ToolResult::err("模型服务暂不可用"),
+        };
         let messages = vec![
-            ChatMessage {
+            ToolChatMessage {
                 role: "system".into(),
                 content: system_prompt.into(),
                 tool_calls: None,
                 tool_call_id: None,
             },
-            ChatMessage {
+            ToolChatMessage {
                 role: "user".into(),
                 content: user_prompt,
                 tool_calls: None,
@@ -169,7 +173,7 @@ impl OfficeTool for SheetGenerateTool {
             .and_then(|c| c.message.content.as_deref())
             .unwrap_or("");
 
-        let output: SheetOutput = match LlmClient::extract_json(content)
+        let output: SheetOutput = match ToolChatClient::extract_json(content)
             .and_then(|v| serde_json::from_value::<SheetOutput>(v).map_err(|e| anyhow::anyhow!(e)))
         {
             Ok(o) => o,

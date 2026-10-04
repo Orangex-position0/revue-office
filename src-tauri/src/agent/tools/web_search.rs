@@ -9,7 +9,29 @@ use std::time::Duration;
 
 use crate::agent::tool::{OfficeTool, ToolArtifact, ToolContext, ToolResult};
 
-pub struct WebSearchTool;
+#[derive(Clone)]
+pub struct WebSearchConfig {
+    pub provider: String,
+    pub endpoint: String,
+    pub baidu_mcp_sse_endpoint: String,
+    pub timeout: Duration,
+}
+
+pub struct WebSearchTool {
+    credentials: std::sync::Arc<dyn crate::providers::credentials::CredentialStore>,
+    config: WebSearchConfig,
+}
+impl WebSearchTool {
+    pub fn new(
+        credentials: std::sync::Arc<dyn crate::providers::credentials::CredentialStore>,
+        config: WebSearchConfig,
+    ) -> Self {
+        Self {
+            credentials,
+            config,
+        }
+    }
+}
 
 #[derive(Debug, Clone, Serialize)]
 struct SearchResultItem {
@@ -95,8 +117,49 @@ impl OfficeTool for WebSearchTool {
             }),
         );
 
-        match search_web(query, max_results).await {
-            Ok(outcome) => {
+        use crate::providers::credentials::{CredentialPurpose, CredentialScope};
+        use secrecy::ExposeSecret;
+        let scope = CredentialScope::web_search(&ctx.user_id, "builtin-baidu-ai-search");
+        let keys = match self.credentials.resolve(&scope).await {
+            Ok(Some(value)) => Some(value),
+            Ok(None) => match self
+                .credentials
+                .resolve(&CredentialScope {
+                    actor_id: "__runtime_startup__".into(),
+                    profile_id: "default".into(),
+                    provider_id: "baidu-mcp".into(),
+                    purpose: CredentialPurpose::WebSearch,
+                })
+                .await
+            {
+                Ok(value) => value,
+                Err(_) => return ToolResult::err("搜索凭据服务暂不可用"),
+            },
+            Err(_) => return ToolResult::err("搜索凭据服务暂不可用"),
+        };
+        if keys
+            .as_ref()
+            .is_some_and(|keys| !keys.matches_endpoint(&self.config.baidu_mcp_sse_endpoint))
+        {
+            return ToolResult::err("搜索凭据与服务地址不匹配，请更新安全凭据配置");
+        }
+        let key = keys
+            .as_ref()
+            .and_then(|k| k.values().first())
+            .map(|k| k.expose_secret().as_str())
+            .unwrap_or("");
+        match search_web(&self.config, query, max_results, key).await {
+            Ok(mut outcome) => {
+                if let Some(keys) = keys.as_ref() {
+                    for item in &mut outcome.items {
+                        for key in keys.values() {
+                            let value = key.expose_secret();
+                            item.title = item.title.replace(value, "[REDACTED]");
+                            item.url = item.url.replace(value, "[REDACTED]");
+                            item.snippet = item.snippet.replace(value, "[REDACTED]");
+                        }
+                    }
+                }
                 let provider_label = outcome.provider.label();
                 let providers_tried = outcome
                     .providers_tried
@@ -119,7 +182,9 @@ impl OfficeTool for WebSearchTool {
                 );
 
                 let observation = if outcome.items.is_empty() {
-                    format!("已完成联网检索，本次来源为 {provider_label}，但没有找到与“{query}”相关的公开网页结果。已尝试：{tried_summary}。")
+                    format!(
+                        "已完成联网检索，本次来源为 {provider_label}，但没有找到与“{query}”相关的公开网页结果。已尝试：{tried_summary}。"
+                    )
                 } else {
                     let lines = outcome
                         .items
@@ -170,26 +235,30 @@ impl OfficeTool for WebSearchTool {
                     continue_loop: None,
                 }
             }
-            Err(err) => ToolResult::err(format!("联网检索失败: {err}")),
+            Err(_) => ToolResult::err("联网检索失败：搜索服务暂不可用"),
         }
     }
 }
 
-async fn search_web(query: &str, max_results: usize) -> anyhow::Result<SearchOutcome> {
-    let cfg = crate::config::config();
+async fn search_web(
+    config: &WebSearchConfig,
+    query: &str,
+    max_results: usize,
+    api_key: &str,
+) -> anyhow::Result<SearchOutcome> {
     let client = Client::builder()
-        .timeout(Duration::from_millis(cfg.web_search_timeout_ms))
+        .timeout(config.timeout)
         .user_agent("Mozilla/5.0 (compatible; revueOffice/0.2; +https://localhost)")
         .build()?;
 
-    let provider = cfg.web_search_provider.trim().to_lowercase();
+    let provider = config.provider.trim().to_lowercase();
     match provider.as_str() {
         "baidu_mcp" => search_with_baidu_mcp(
             &client,
             query,
             max_results,
-            &cfg.baidu_mcp_sse_endpoint,
-            &cfg.baidu_mcp_api_key,
+            &config.baidu_mcp_sse_endpoint,
+            api_key,
         )
         .await
         .map(|items| SearchOutcome {
@@ -204,7 +273,7 @@ async fn search_web(query: &str, max_results: usize) -> anyhow::Result<SearchOut
                 items,
                 providers_tried: vec![SearchProvider::Baidu],
             }),
-        "searxng" => search_with_searxng(&client, query, max_results, &cfg.web_search_endpoint)
+        "searxng" => search_with_searxng(&client, query, max_results, &config.endpoint)
             .await
             .map(|items| SearchOutcome {
                 provider: SearchProvider::Searxng,
@@ -221,7 +290,7 @@ async fn search_web(query: &str, max_results: usize) -> anyhow::Result<SearchOut
         _ => {
             let mut attempts = Vec::new();
             if contains_cjk(query) {
-                if !cfg.baidu_mcp_api_key.trim().is_empty() {
+                if !api_key.trim().is_empty() {
                     attempts.push(SearchProvider::BaiduMcp);
                 }
                 attempts.push(SearchProvider::Baidu);
@@ -230,7 +299,7 @@ async fn search_web(query: &str, max_results: usize) -> anyhow::Result<SearchOut
             } else {
                 attempts.push(SearchProvider::Searxng);
                 attempts.push(SearchProvider::DuckDuckGo);
-                if !cfg.baidu_mcp_api_key.trim().is_empty() {
+                if !api_key.trim().is_empty() {
                     attempts.push(SearchProvider::BaiduMcp);
                 }
                 attempts.push(SearchProvider::Baidu);
@@ -245,15 +314,14 @@ async fn search_web(query: &str, max_results: usize) -> anyhow::Result<SearchOut
                             &client,
                             query,
                             max_results,
-                            &cfg.baidu_mcp_sse_endpoint,
-                            &cfg.baidu_mcp_api_key,
+                            &config.baidu_mcp_sse_endpoint,
+                            api_key,
                         )
                         .await
                     }
                     SearchProvider::Baidu => search_with_baidu(&client, query, max_results).await,
                     SearchProvider::Searxng => {
-                        search_with_searxng(&client, query, max_results, &cfg.web_search_endpoint)
-                            .await
+                        search_with_searxng(&client, query, max_results, &config.endpoint).await
                     }
                     SearchProvider::DuckDuckGo => {
                         search_with_duckduckgo(&client, query, max_results).await

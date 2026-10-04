@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result, anyhow};
 use std::fs::{self, File};
 use std::io::{BufWriter, Write};
 use std::path::{Path, PathBuf};
@@ -173,6 +173,7 @@ impl Canvas {
 }
 
 pub async fn generate_local_video(
+    render_dir: &Path,
     topic: &str,
     aspect_ratio: &str,
     requested_width: u32,
@@ -182,7 +183,7 @@ pub async fn generate_local_video(
 ) -> Result<LocalVideoOutput> {
     ensure_ffmpeg_available().await?;
 
-    let render_dir = PathBuf::from(&crate::config::config().render_output_dir);
+    let render_dir = PathBuf::from(render_dir);
     let video_id = Uuid::new_v4().to_string();
     let video_dir = render_dir.join("videos").join(&video_id);
     let frames_dir = video_dir.join("frames");

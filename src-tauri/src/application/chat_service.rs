@@ -5,26 +5,25 @@ use std::task::{Context, Poll};
 use futures::Stream;
 use tokio::sync::mpsc;
 
-use super::artifact_service::ArtifactService;
+use super::artifacts::{ArtifactDraft, ArtifactService};
 use super::error::ChatApplicationError;
 use super::event::ApplicationEvent;
-use crate::agent::event::RuntimeEvent;
-use crate::agent::runtime::{AgentRuntime, RuntimeCancellationHandle};
-use crate::contracts::agent_run::{RuntimeAttachment, RuntimeMessage, RuntimeRequest};
-use crate::contracts::artifact::ArtifactDraft;
-use crate::contracts::conversation::{ConversationMessage, NewConversation};
-use crate::contracts::presentation::PresentationProgress;
-use crate::ports::repositories::session::SessionRepository;
+use crate::agent::{
+    AgentRunner, OfficeAgentEvent, OfficeAgentRequest, OfficeAttachment, OfficeCancellationHandle,
+    OfficeFailureKind, OfficeMessage,
+};
+use crate::application::conversations::SessionRepository;
+use crate::application::conversations::model::{ConversationMessage, NewConversation};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ChatCommand {
-    pub owner_id: String,
+    pub actor: super::identity::Actor,
     pub session_id: Option<String>,
     pub project_id: Option<String>,
     pub message: String,
     pub runtime_message: Option<String>,
     pub preferred_model: Option<String>,
-    pub attachments: Vec<RuntimeAttachment>,
+    pub attachments: Vec<OfficeAttachment>,
     pub tool_config: Option<serde_json::Value>,
     pub allowed_tools: Option<Vec<String>>,
     pub max_turns: usize,
@@ -32,7 +31,7 @@ pub struct ChatCommand {
 
 pub struct ChatEventStream {
     receiver: mpsc::Receiver<ApplicationEvent>,
-    cancellation: RuntimeCancellationHandle,
+    cancellation: OfficeCancellationHandle,
 }
 
 impl ChatEventStream {
@@ -58,7 +57,7 @@ impl Drop for ChatEventStream {
 pub struct ChatRunHandle {
     pub session_id: String,
     pub events: ChatEventStream,
-    cancellation: RuntimeCancellationHandle,
+    cancellation: OfficeCancellationHandle,
 }
 
 impl ChatRunHandle {
@@ -69,7 +68,7 @@ impl ChatRunHandle {
 
 pub struct ChatApplicationService {
     repository: Arc<dyn SessionRepository>,
-    runtime: Arc<AgentRuntime>,
+    agent: Arc<dyn AgentRunner>,
     artifact_service: Option<Arc<ArtifactService>>,
     event_capacity: usize,
 }
@@ -77,12 +76,12 @@ pub struct ChatApplicationService {
 impl ChatApplicationService {
     pub fn new(
         repository: Arc<dyn SessionRepository>,
-        runtime: Arc<AgentRuntime>,
+        agent: Arc<dyn AgentRunner>,
         event_capacity: usize,
     ) -> Self {
         Self {
             repository,
-            runtime,
+            agent,
             artifact_service: None,
             event_capacity: event_capacity.max(1),
         }
@@ -90,13 +89,13 @@ impl ChatApplicationService {
 
     pub fn with_artifact_service(
         repository: Arc<dyn SessionRepository>,
-        runtime: Arc<AgentRuntime>,
+        agent: Arc<dyn AgentRunner>,
         artifact_service: Arc<ArtifactService>,
         event_capacity: usize,
     ) -> Self {
         Self {
             repository,
-            runtime,
+            agent,
             artifact_service: Some(artifact_service),
             event_capacity: event_capacity.max(1),
         }
@@ -117,14 +116,14 @@ impl ChatApplicationService {
                 .find_by_id(session_id)
                 .await?
                 .ok_or(ChatApplicationError::NotFound)?;
-            if conversation.owner_id != command.owner_id {
+            if !command.actor.owns(&conversation.owner_id) {
                 return Err(ChatApplicationError::Forbidden);
             }
             conversation
         } else {
             self.repository
                 .create(NewConversation {
-                    owner_id: command.owner_id.clone(),
+                    owner_id: command.actor.id.0.clone(),
                     project_id: command.project_id.clone(),
                     tool_kind: Some("general".into()),
                     title: conversation_title(&message),
@@ -146,10 +145,10 @@ impl ChatApplicationService {
             )
             .await?;
 
-        let runtime_handle = self.runtime.start(RuntimeRequest {
+        let runtime_handle = self.agent.start(OfficeAgentRequest {
             run_id: uuid::Uuid::new_v4().to_string(),
             session_id: conversation.id.clone(),
-            user_id: command.owner_id,
+            user_id: command.actor.id.0,
             project_id: command.project_id,
             preferred_model: command.preferred_model,
             attachments: command.attachments,
@@ -157,7 +156,7 @@ impl ChatApplicationService {
             allowed_tools: command.allowed_tools,
             history: history
                 .into_iter()
-                .map(|message| RuntimeMessage {
+                .map(|message| OfficeMessage {
                     role: message.role,
                     content: message.content,
                 })
@@ -176,78 +175,75 @@ impl ChatApplicationService {
 
         tokio::spawn(async move {
             let mut published_artifacts = Vec::new();
+            let mut terminal_sent = false;
             while let Some(event) = runtime_events.recv().await {
                 let application_event = match event {
-                    RuntimeEvent::Thinking { content } => ApplicationEvent::StateChanged {
+                    OfficeAgentEvent::Thinking { content } => ApplicationEvent::StateChanged {
                         state: "thinking".into(),
                         detail: serde_json::json!({"content": content}),
                     },
-                    RuntimeEvent::ToolStarted { tool, input } => ApplicationEvent::StateChanged {
-                        state: "tool_started".into(),
-                        detail: serde_json::json!({"tool": tool, "input": input}),
-                    },
-                    RuntimeEvent::ToolProgress {
+                    OfficeAgentEvent::ToolStarted { tool, input } => {
+                        ApplicationEvent::StateChanged {
+                            state: "tool_started".into(),
+                            detail: serde_json::json!({"tool": tool, "input": input}),
+                        }
+                    }
+                    OfficeAgentEvent::ToolProgress {
                         tool,
                         stage,
                         detail,
-                    } => ApplicationEvent::StateChanged {
-                        state: "tool_progress".into(),
-                        detail: serde_json::json!({
-                            "tool": tool,
-                            "stage": stage,
-                            "detail": detail,
-                        }),
+                    } => match map_tool_progress(tool, stage, detail) {
+                        Some(event) => event,
+                        None => continue,
                     },
-                    RuntimeEvent::ToolFinished {
-                        tool,
-                        success,
-                        result,
-                    } => ApplicationEvent::ToolResult {
-                        tool,
-                        success,
-                        result,
-                    },
-                    RuntimeEvent::ArtifactProduced { artifact } => {
-                        let Some(artifact_service) = artifact_service.as_ref() else {
-                            task_cancellation.cancel();
-                            let _ = application_sender
-                                .send(ApplicationEvent::Failed {
-                                    code: "artifact_service_unavailable".into(),
-                                    message: "Artifact publication is unavailable".into(),
+                    OfficeAgentEvent::ToolFinished { tool, result } => {
+                        ApplicationEvent::ToolResult {
+                            tool,
+                            success: true,
+                            result,
+                        }
+                    }
+                    OfficeAgentEvent::OutputProduced { output } => {
+                        match artifact_service.as_ref() {
+                            Some(artifact_service) => match artifact_service
+                                .publish(ArtifactDraft {
+                                    session_id: session_id.clone(),
+                                    owner_id: owner_id.clone(),
+                                    kind: output.kind,
+                                    title: output.title,
+                                    extension: output.extension,
+                                    content: output.content,
+                                    bytes: output.bytes,
                                 })
-                                .await;
-                            break;
-                        };
-                        match artifact_service
-                            .publish(ArtifactDraft {
-                                session_id: session_id.clone(),
-                                owner_id: owner_id.clone(),
-                                kind: artifact.kind,
-                                title: artifact.title,
-                                extension: artifact.extension,
-                                content: artifact.content,
-                                bytes: artifact.bytes,
-                            })
-                            .await
-                        {
-                            Ok(publication) => {
-                                published_artifacts.push(publication.clone());
-                                ApplicationEvent::ArtifactUpdated {
-                                    artifact: publication,
-                                    artifacts: published_artifacts.clone(),
+                                .await
+                            {
+                                Ok(publication) => {
+                                    debug_assert!(publication.is_ready());
+                                    published_artifacts.push(publication.clone());
+                                    ApplicationEvent::ArtifactUpdated {
+                                        artifact: publication,
+                                        artifacts: published_artifacts.clone(),
+                                    }
                                 }
-                            }
-                            Err(error) => {
+                                Err(error) => {
+                                    task_cancellation.cancel();
+                                    ApplicationEvent::Failed {
+                                        code: "artifact_publication_failed".into(),
+                                        message: error.to_string(),
+                                    }
+                                }
+                            },
+                            None => {
                                 task_cancellation.cancel();
                                 ApplicationEvent::Failed {
-                                    code: "artifact_publication_failed".into(),
-                                    message: error.to_string(),
+                                    code: "artifact_service_unavailable".into(),
+                                    message: "Artifact publication is unavailable".into(),
                                 }
                             }
                         }
                     }
-                    RuntimeEvent::MessageProduced { content } => {
-                        if repository
+                    OfficeAgentEvent::MessageProduced { content } => {
+                        match repository
                             .append_message(
                                 &session_id,
                                 ConversationMessage {
@@ -259,57 +255,22 @@ impl ChatApplicationService {
                                 },
                             )
                             .await
-                            .is_err()
                         {
-                            let _ = application_sender
-                                .send(ApplicationEvent::Failed {
+                            Ok(()) => ApplicationEvent::Message { content },
+                            Err(_) => {
+                                task_cancellation.cancel();
+                                ApplicationEvent::Failed {
                                     code: "message_persistence_failed".into(),
                                     message: "Unable to persist the assistant message".into(),
-                                })
-                                .await;
-                            task_cancellation.cancel();
-                            break;
+                                }
+                            }
                         }
-                        ApplicationEvent::Message { content }
                     }
-                    RuntimeEvent::TurnFinished { turn } => ApplicationEvent::StateChanged {
+                    OfficeAgentEvent::TurnFinished { turn } => ApplicationEvent::StateChanged {
                         state: "turn_finished".into(),
                         detail: serde_json::json!({"turn": turn}),
                     },
-                    RuntimeEvent::PresentationProgress { progress } => match progress {
-                        PresentationProgress::Planning => ApplicationEvent::StateChanged {
-                            state: "规划 PPT 大纲".into(),
-                            detail: serde_json::json!("正在规划演示文稿结构..."),
-                        },
-                        PresentationProgress::ProjectCreated { project } => {
-                            ApplicationEvent::ProjectUpdated {
-                                project: serde_json::to_value(project)
-                                    .unwrap_or_else(|_| serde_json::json!({})),
-                            }
-                        }
-                        PresentationProgress::SlideGenerated {
-                            project,
-                            current_index,
-                            total_slides,
-                        } => {
-                            let mut slide = serde_json::to_value(project)
-                                .unwrap_or_else(|_| serde_json::json!({}));
-                            if let Some(object) = slide.as_object_mut() {
-                                object.insert("current_index".into(), current_index.into());
-                                object.insert("total_slides".into(), total_slides.into());
-                                object.insert("slide_count".into(), (current_index + 1).into());
-                            }
-                            ApplicationEvent::SlideUpdated { slide }
-                        }
-                        PresentationProgress::Completed { .. } => continue,
-                    },
-                    RuntimeEvent::LegacyProgress { progress } => {
-                        ApplicationEvent::LegacyToolProgress {
-                            event: progress.event,
-                            data: progress.data,
-                        }
-                    }
-                    RuntimeEvent::Completed { summary } => {
+                    OfficeAgentEvent::Completed { summary } => {
                         if repository
                             .update_summary(&session_id, &summary)
                             .await
@@ -327,19 +288,29 @@ impl ChatApplicationService {
                             }
                         }
                     }
-                    RuntimeEvent::Failed { kind, message } => ApplicationEvent::Failed {
-                        code: format!("runtime_{kind:?}").to_lowercase(),
+                    OfficeAgentEvent::Failed { kind, message } => ApplicationEvent::Failed {
+                        code: failure_code(kind).into(),
                         message,
                     },
                 };
                 let terminal = application_event.is_terminal();
                 if application_sender.send(application_event).await.is_err() {
                     task_cancellation.cancel();
-                    break;
+                    return;
                 }
                 if terminal {
+                    terminal_sent = true;
                     break;
                 }
+            }
+            if !terminal_sent {
+                task_cancellation.cancel();
+                let _ = application_sender
+                    .send(ApplicationEvent::Failed {
+                        code: "runtime_internal".into(),
+                        message: "Agent event stream ended without a terminal event".into(),
+                    })
+                    .await;
             }
         });
 
@@ -351,6 +322,57 @@ impl ChatApplicationService {
             },
             cancellation,
         })
+    }
+}
+
+fn map_tool_progress(
+    tool: String,
+    stage: String,
+    detail: serde_json::Value,
+) -> Option<ApplicationEvent> {
+    if stage == "legacy" {
+        return Some(ApplicationEvent::LegacyToolProgress {
+            event: detail
+                .get("event")
+                .and_then(serde_json::Value::as_str)
+                .unwrap_or("state_update")
+                .to_owned(),
+            data: detail
+                .get("data")
+                .cloned()
+                .unwrap_or(serde_json::Value::Null),
+        });
+    }
+    match stage.as_str() {
+        "presentation.planning" => {
+            return Some(ApplicationEvent::StateChanged {
+                state: "规划 PPT 大纲".into(),
+                detail: serde_json::json!("正在规划演示文稿结构..."),
+            });
+        }
+        "presentation.project_created" => {
+            return Some(ApplicationEvent::ProjectUpdated { project: detail });
+        }
+        "presentation.slide_generated" => {
+            return Some(ApplicationEvent::SlideUpdated { slide: detail });
+        }
+        "presentation.generated" => return None,
+        _ => {}
+    }
+    Some(ApplicationEvent::StateChanged {
+        state: "tool_progress".into(),
+        detail: serde_json::json!({"tool": tool, "stage": stage, "detail": detail}),
+    })
+}
+
+fn failure_code(kind: OfficeFailureKind) -> &'static str {
+    match kind {
+        OfficeFailureKind::Cancelled => "runtime_cancelled",
+        OfficeFailureKind::Timeout => "runtime_timeout",
+        OfficeFailureKind::Provider => "runtime_model",
+        OfficeFailureKind::Tool => "runtime_tool",
+        OfficeFailureKind::MaximumTurns => "runtime_maximumturns",
+        OfficeFailureKind::Internal => "runtime_internal",
     }
 }
 

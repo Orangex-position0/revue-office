@@ -1,9 +1,8 @@
 use async_trait::async_trait;
 use serde_json::json;
 
+use super::chat_provider::{ToolChatClient, ToolChatMessage};
 use crate::agent::tool::{OfficeTool, ToolArtifact, ToolContext, ToolResult};
-use crate::llm::LlmClient;
-use crate::models::ChatMessage;
 
 pub struct DrawioGenerateTool;
 
@@ -134,17 +133,22 @@ XML 格式示例：
 - 优先生成“对外能讲清楚”的布局，不要把所有节点简单排成一行
 - 如用户没有给出细节，请补足合理的模块、阶段、角色或系统组件，使图更像正式方案图"#;
 
-        let user_prompt = format!("请生成一张{diagram_type}图表，要求既便于阅读，也便于后续在 draw.io 中继续编辑。\n场景偏好：{scene_guide}\n需求：{topic}");
+        let user_prompt = format!(
+            "请生成一张{diagram_type}图表，要求既便于阅读，也便于后续在 draw.io 中继续编辑。\n场景偏好：{scene_guide}\n需求：{topic}"
+        );
 
-        let client = LlmClient::for_user(&ctx.user_id, ctx.preferred_model.as_deref()).await;
+        let client = match ToolChatClient::for_context(ctx).await {
+            Ok(client) => client,
+            Err(_) => return ToolResult::err("模型服务暂不可用"),
+        };
         let messages = vec![
-            ChatMessage {
+            ToolChatMessage {
                 role: "system".into(),
                 content: system_prompt.into(),
                 tool_calls: None,
                 tool_call_id: None,
             },
-            ChatMessage {
+            ToolChatMessage {
                 role: "user".into(),
                 content: user_prompt,
                 tool_calls: None,

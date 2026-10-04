@@ -1,27 +1,11 @@
 pub mod agent;
-mod app;
+pub mod agent_core;
 pub mod application;
-mod auth;
+pub mod bootstrap;
 pub mod capabilities;
-mod commands;
-mod config;
-pub mod contracts;
-mod db;
-mod error;
-mod file_extract;
-mod files;
-mod image_ocr;
 pub mod infrastructure;
-mod llm;
-mod models;
-pub mod ports;
-mod render;
-mod routes;
-mod state;
+pub mod providers;
 pub mod transport;
-
-use std::net::SocketAddr;
-use tracing::info;
 
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 #[tauri::command]
@@ -30,36 +14,7 @@ fn greet(name: &str) -> String {
 }
 
 async fn start_axum_server() -> anyhow::Result<()> {
-    let cfg = config::config();
-    cfg.ensure_dirs()?;
-
-    let pool = state::init_db_pool().await;
-    let services = app::bootstrap::build_application_services(
-        &cfg.database_url,
-        cfg.db_max_connections,
-        std::path::Path::new(&cfg.data_dir).join("artifacts"),
-        std::time::Duration::from_millis(cfg.llm_tool_timeout_ms),
-    )
-    .await?;
-    state::set_db_pool(pool);
-    app::state::set_services(services.session, services.chat)?;
-
-    let app = routes::build_router();
-    let addr: SocketAddr = format!("{}:{}", cfg.host, cfg.port).parse()?;
-
-    info!("🚀 {} API running at http://{}", cfg.app_name, addr);
-    info!("📝 LLM: {} @ {}", cfg.llm_model, cfg.llm_base_url);
-    info!("📂 Projects: {}", cfg.projects_dir);
-    if cfg.is_mysql() {
-        info!("🗄️ Database: MySQL");
-    } else {
-        info!("🗄️ Database: SQLite");
-    }
-
-    let listener = tokio::net::TcpListener::bind(addr).await?;
-    axum::serve(listener, app).await?;
-
-    Ok(())
+    bootstrap::run().await.map_err(anyhow::Error::new)
 }
 
 fn init_tracing() {

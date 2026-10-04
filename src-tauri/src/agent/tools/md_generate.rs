@@ -2,9 +2,8 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
+use super::chat_provider::{ToolChatClient, ToolChatMessage};
 use crate::agent::tool::{OfficeTool, ToolArtifact, ToolContext, ToolResult};
-use crate::llm::LlmClient;
-use crate::models::ChatMessage;
 
 pub struct MarkdownGenerateTool;
 
@@ -138,10 +137,18 @@ impl OfficeTool for MarkdownGenerateTool {
         );
 
         let style_guide = match style {
-            "readme" => "输出 README 风格文档，优先包含简介、核心能力、快速开始、使用步骤、目录结构、示例、注意事项，适合直接放仓库首页。",
-            "guide" => "输出操作指南，优先包含适用场景、前置条件、步骤说明、关键截图说明位、常见问题和注意事项，适合直接给用户阅读。",
-            "notes" => "输出会议纪要或整理笔记，优先包含会议背景、关键结论、待办事项、责任人、时间点和后续跟进。",
-            "research" => "输出调研整理文档，优先包含背景、信息来源、关键信息摘要、对比、结论和建议，适合知识沉淀。",
+            "readme" => {
+                "输出 README 风格文档，优先包含简介、核心能力、快速开始、使用步骤、目录结构、示例、注意事项，适合直接放仓库首页。"
+            }
+            "guide" => {
+                "输出操作指南，优先包含适用场景、前置条件、步骤说明、关键截图说明位、常见问题和注意事项，适合直接给用户阅读。"
+            }
+            "notes" => {
+                "输出会议纪要或整理笔记，优先包含会议背景、关键结论、待办事项、责任人、时间点和后续跟进。"
+            }
+            "research" => {
+                "输出调研整理文档，优先包含背景、信息来源、关键信息摘要、对比、结论和建议，适合知识沉淀。"
+            }
             _ => "输出知识库风格文档，优先包含概览、核心说明、要点列表、示例、FAQ 和补充说明。",
         };
 
@@ -163,18 +170,25 @@ impl OfficeTool for MarkdownGenerateTool {
 
         let user_prompt = format!(
             "请根据以下需求生成一份适合保存为 Markdown 文件的正式内容，要求读起来像可直接发布的成品文档。要求：{style_guide}\n场景偏好：{scene_guide}\n{}用户需求：{topic}",
-            if audience.is_empty() { String::new() } else { format!("目标读者：{audience}\n") }
+            if audience.is_empty() {
+                String::new()
+            } else {
+                format!("目标读者：{audience}\n")
+            }
         );
 
-        let client = LlmClient::for_user(&ctx.user_id, ctx.preferred_model.as_deref()).await;
+        let client = match ToolChatClient::for_context(ctx).await {
+            Ok(client) => client,
+            Err(_) => return ToolResult::err("模型服务暂不可用"),
+        };
         let messages = vec![
-            ChatMessage {
+            ToolChatMessage {
                 role: "system".into(),
                 content: system_prompt.into(),
                 tool_calls: None,
                 tool_call_id: None,
             },
-            ChatMessage {
+            ToolChatMessage {
                 role: "user".into(),
                 content: user_prompt,
                 tool_calls: None,
@@ -193,13 +207,15 @@ impl OfficeTool for MarkdownGenerateTool {
             .and_then(|c| c.message.content.as_deref())
             .unwrap_or("");
 
-        let output: MarkdownOutput = match LlmClient::extract_json(content).and_then(|v| {
+        let output: MarkdownOutput = match ToolChatClient::extract_json(content).and_then(|v| {
             serde_json::from_value::<MarkdownOutput>(v).map_err(|e| anyhow::anyhow!(e))
         }) {
             Ok(doc) => doc,
             Err(e) => MarkdownOutput {
                 title: topic.chars().take(32).collect(),
-                markdown: format!("# {topic}\n\n## 待补充\n\n- 请补充核心内容\n- 请补充结构化说明\n\n> 当前为降级草稿：{e}"),
+                markdown: format!(
+                    "# {topic}\n\n## 待补充\n\n- 请补充核心内容\n- 请补充结构化说明\n\n> 当前为降级草稿：{e}"
+                ),
                 summary: Some(format!("Markdown 文档《{topic}》已生成（降级草稿）")),
             },
         };

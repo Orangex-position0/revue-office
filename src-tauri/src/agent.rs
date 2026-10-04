@@ -1,13 +1,11 @@
-pub mod agent_loop;
-pub mod context;
-pub mod event;
-pub mod intent;
-pub mod registry;
-pub mod runtime;
+mod office_agent;
+mod profile;
+mod prompt;
 pub mod tool;
 pub mod tools;
 
-pub use agent_loop::{run_agent_loop, AgentConfig, AgentEvent};
-pub use intent::IntentAnalyzer;
-pub use registry::ToolRegistry;
-pub use tool::{OfficeTool, ToolArtifact, ToolContext, ToolResult};
+pub use office_agent::{
+    AgentRunner, OfficeAgent, OfficeAgentEvent, OfficeAgentRunHandle, OfficeCancellationHandle,
+    OfficeFailureKind, OfficeGeneratedOutput,
+};
+pub use profile::{OfficeAgentRequest, OfficeAttachment, OfficeMessage};
