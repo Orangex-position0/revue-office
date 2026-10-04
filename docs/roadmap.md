@@ -15,6 +15,7 @@
 ## Others
 
 - [ ] 项目的 logo 需要重新设计
+- [x] 项目改用 rust 2024 edition
 
 ## Bugs
 
