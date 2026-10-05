@@ -1,0 +1,102 @@
+default_install_hook_types = ["pre-commit", "pre-push", "commit-msg"]
+
+[[repos]]
+repo = "local"
+
+[[repos.hooks]]
+id = "frontend-format"
+name = "Frontend formatting (Prettier)"
+language = "system"
+entry = "pnpm exec prettier --check"
+files = '\.(ts|tsx|js|jsx|mjs|json|css|md)$'
+exclude = '^(src-tauri/|dist/|outputs/|data/|public/)'
+stages = ["pre-commit"]
+
+[[repos.hooks]]
+id = "frontend-lint"
+name = "Frontend ESLint"
+language = "system"
+entry = "pnpm lint"
+files = '(^src/|\.(ts|tsx|js|jsx|mjs)$|^package\.json$|^pnpm-lock\.yaml$|^prek\.toml$)'
+exclude = '^src-tauri/'
+pass_filenames = false
+stages = ["pre-commit"]
+
+[[repos.hooks]]
+id = "frontend-typecheck"
+name = "Frontend TypeScript"
+language = "system"
+entry = "pnpm typecheck"
+files = '(^src/|^tsconfig.*\.json$|^vite\.config\.ts$|^package\.json$|^pnpm-lock\.yaml$|^prek\.toml$)'
+pass_filenames = false
+stages = ["pre-commit"]
+
+[[repos.hooks]]
+id = "secret-scan"
+name = "Staged secret scan"
+language = "system"
+entry = "gitleaks protect --staged --redact"
+pass_filenames = false
+always_run = true
+stages = ["pre-commit"]
+
+[[repos.hooks]]
+id = "rust-fmt"
+name = "Rust formatting"
+language = "system"
+entry = "cargo fmt --manifest-path src-tauri/Cargo.toml --all -- --check"
+files = '(^src-tauri/|^prek\.toml$)'
+pass_filenames = false
+stages = ["pre-commit"]
+
+[[repos.hooks]]
+id = "rust-check"
+name = "Rust compilation check"
+language = "system"
+entry = "cargo check --manifest-path src-tauri/Cargo.toml --locked --all-targets --all-features"
+files = '(^src-tauri/|^prek\.toml$)'
+pass_filenames = false
+stages = ["pre-commit"]
+
+[[repos.hooks]]
+id = "rust-todo"
+name = "Rust TODO review"
+language = "system"
+entry = "node scripts/rust-todo.mjs"
+files = '(^src-tauri/|^scripts/rust-todo\.mjs$|^prek\.toml$)'
+pass_filenames = false
+stages = ["pre-commit"]
+
+[[repos.hooks]]
+id = "frontend-build"
+name = "Frontend production build"
+language = "system"
+entry = "pnpm build"
+pass_filenames = false
+always_run = true
+stages = ["pre-push"]
+
+[[repos.hooks]]
+id = "rust-clippy"
+name = "Rust Clippy"
+language = "system"
+entry = "cargo clippy --manifest-path src-tauri/Cargo.toml --locked --all-targets --all-features -- -D warnings"
+pass_filenames = false
+always_run = true
+stages = ["pre-push"]
+
+[[repos.hooks]]
+id = "rust-test"
+name = "Rust tests (nextest)"
+language = "system"
+entry = "cargo nextest run --manifest-path src-tauri/Cargo.toml --locked"
+pass_filenames = false
+always_run = true
+stages = ["pre-push"]
+
+[[repos.hooks]]
+id = "commit-message"
+name = "Conventional Commit message"
+language = "system"
+entry = "node scripts/check-commit-message.mjs"
+stages = ["commit-msg"]

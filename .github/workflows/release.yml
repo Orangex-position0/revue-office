@@ -1,0 +1,90 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  checks:
+    name: Release checks
+    uses: ./.github/workflows/ci.yml
+    permissions:
+      contents: read
+
+  windows:
+    name: Windows installers
+    needs: checks
+    runs-on: windows-latest
+    timeout-minutes: 60
+    permissions:
+      contents: write
+    env:
+      CARGO_TERM_COLOR: always
+      PYTHONUTF8: '1'
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.8.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.14.0
+          cache: pnpm
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.95.0
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+      - run: pnpm install --frozen-lockfile
+      - name: Verify tag and package versions
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import fs from 'node:fs';
+          const tag = process.env.RELEASE_TAG;
+          assert.match(tag, /^v\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/);
+          const version = tag.slice(1);
+          const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+          const tauri = JSON.parse(fs.readFileSync('src-tauri/tauri.conf.json', 'utf8'));
+          const manifest = fs.readFileSync('src-tauri/Cargo.toml', 'utf8');
+          const packageSection = manifest.split('[package]')[1]?.split(/\n\[/)[0];
+          const cargoVersion = packageSection?.match(/^version\s*=\s*"([^"]+)"/m)?.[1];
+          for (const actual of [pkg.version, tauri.version, cargoVersion]) {
+            assert.equal(actual, version, `Tag ${tag} must match all package versions`);
+          }
+          console.log(`Release version verified: ${version}`);
+          NODE
+      - name: Build and upload draft release
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tauriScript: pnpm tauri
+          args: --ci --bundles nsis,msi -- --locked
+          tagName: ${{ github.ref_name }}
+          releaseName: Revue Office ${{ github.ref_name }}
+          releaseBody: |
+            Windows x64 installers. These builds are unsigned and may trigger
+            Windows SmartScreen warnings. Review the release notes and assets
+            before publishing this draft.
+          releaseDraft: true
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          uploadUpdaterJson: false
+          uploadUpdaterSignatures: false
+          uploadWorkflowArtifacts: true
+          generateReleaseNotes: true

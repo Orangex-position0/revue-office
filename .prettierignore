@@ -1,0 +1,10 @@
+node_modules/
+dist/
+dist-ssr/
+data/
+outputs/
+public/
+src-tauri/
+pnpm-lock.yaml
+.spec/
+.sdd/
