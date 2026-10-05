@@ -59,11 +59,9 @@ impl PresentationStore for LocalPresentationStore {
             .map_err(|error| PresentationStoreError::Unavailable(error.into()))?;
 
         let had_previous = tokio::fs::metadata(&path).await.is_ok();
-        if had_previous {
-            if let Err(error) = tokio::fs::rename(&path, &backup).await {
-                let _ = tokio::fs::remove_file(&temporary).await;
-                return Err(PresentationStoreError::Unavailable(error.into()));
-            }
+        if had_previous && let Err(error) = tokio::fs::rename(&path, &backup).await {
+            let _ = tokio::fs::remove_file(&temporary).await;
+            return Err(PresentationStoreError::Unavailable(error.into()));
         }
         if let Err(error) = tokio::fs::rename(&temporary, &path).await {
             if had_previous {
@@ -104,10 +102,10 @@ impl PresentationStore for LocalPresentationStore {
             if path.extension().and_then(|value| value.to_str()) != Some("json") {
                 continue;
             }
-            if let Ok(Some(project)) = Self::read_path(&path).await {
-                if project.owner_id == owner_id {
-                    projects.push(project);
-                }
+            if let Ok(Some(project)) = Self::read_path(&path).await
+                && project.owner_id == owner_id
+            {
+                projects.push(project);
             }
         }
         projects.sort_by(|left, right| right.updated_at.cmp(&left.updated_at));

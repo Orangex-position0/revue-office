@@ -71,31 +71,31 @@ pub fn render_docx(data: &DocData, output_path: &std::path::Path) -> Result<()> 
             );
         }
 
-        if let Some(table) = &section.table {
-            if !table.headers.is_empty() {
-                // 构建表头行
-                let mut header_cells: Vec<TableCell> = Vec::new();
-                for header in &table.headers {
-                    header_cells.push(TableCell::new().add_paragraph(
-                        Paragraph::new().add_run(Run::new().add_text(header).bold().size(20)),
+        if let Some(table) = &section.table
+            && !table.headers.is_empty()
+        {
+            // 构建表头行
+            let mut header_cells: Vec<TableCell> = Vec::new();
+            for header in &table.headers {
+                header_cells.push(TableCell::new().add_paragraph(
+                    Paragraph::new().add_run(Run::new().add_text(header).bold().size(20)),
+                ));
+            }
+            let mut rows: Vec<TableRow> = vec![TableRow::new(header_cells)];
+
+            // 数据行
+            for row in &table.rows {
+                let mut cells: Vec<TableCell> = Vec::new();
+                for cell in row {
+                    cells.push(TableCell::new().add_paragraph(
+                        Paragraph::new().add_run(Run::new().add_text(cell).size(20)),
                     ));
                 }
-                let mut rows: Vec<TableRow> = vec![TableRow::new(header_cells)];
-
-                // 数据行
-                for row in &table.rows {
-                    let mut cells: Vec<TableCell> = Vec::new();
-                    for cell in row {
-                        cells.push(TableCell::new().add_paragraph(
-                            Paragraph::new().add_run(Run::new().add_text(cell).size(20)),
-                        ));
-                    }
-                    rows.push(TableRow::new(cells));
-                }
-
-                let docx_table = Table::new(rows);
-                doc = doc.add_table(docx_table);
+                rows.push(TableRow::new(cells));
             }
+
+            let docx_table = Table::new(rows);
+            doc = doc.add_table(docx_table);
         }
     }
 

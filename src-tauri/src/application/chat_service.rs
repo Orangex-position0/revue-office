@@ -221,7 +221,7 @@ impl ChatApplicationService {
                                     debug_assert!(publication.is_ready());
                                     published_artifacts.push(publication.clone());
                                     ApplicationEvent::ArtifactUpdated {
-                                        artifact: publication,
+                                        artifact: Box::new(publication),
                                         artifacts: published_artifacts.clone(),
                                     }
                                 }

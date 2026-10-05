@@ -172,15 +172,13 @@ impl PreferenceCredentialService {
         let expected = values.copy_for_store();
         // Idempotent migration: a matching existing secure copy need not be
         // rewritten (also enables safe Server migration to a read-only mapping).
-        if !updating {
-            if let Some(existing) = self.store.resolve(scope).await? {
-                if existing.same_values(&expected)
-                    && ((self.store.read_only() && existing.endpoint_binding().is_none())
-                        || existing.endpoint_binding() == expected.endpoint_binding())
-                {
-                    return Ok(existing.len());
-                }
-            }
+        if !updating
+            && let Some(existing) = self.store.resolve(scope).await?
+            && existing.same_values(&expected)
+            && ((self.store.read_only() && existing.endpoint_binding().is_none())
+                || existing.endpoint_binding() == expected.endpoint_binding())
+        {
+            return Ok(existing.len());
         }
         self.store.replace(scope, values).await?;
         let actual = self
@@ -234,15 +232,15 @@ impl PreferenceCredentialService {
                     .map(|s| SecretString::new(s.expose_secret().to_owned())),
             );
         }
-        if let Some(purpose) = startup {
-            if let Some(value) = self.store.resolve(&startup_scope(purpose)).await? {
-                known.extend(
-                    value
-                        .values()
-                        .iter()
-                        .map(|s| SecretString::new(s.expose_secret().to_owned())),
-                );
-            }
+        if let Some(purpose) = startup
+            && let Some(value) = self.store.resolve(&startup_scope(purpose)).await?
+        {
+            known.extend(
+                value
+                    .values()
+                    .iter()
+                    .map(|s| SecretString::new(s.expose_secret().to_owned())),
+            );
         }
         Ok(())
     }

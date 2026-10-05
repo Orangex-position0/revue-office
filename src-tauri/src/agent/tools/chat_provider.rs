@@ -149,98 +149,6 @@ use crate::agent::tool::ToolContext;
 use crate::providers::{self, ContentPart, ResolvedChatProvider, StopReason};
 use anyhow::{Result, anyhow};
 
-#[cfg(test)]
-mod credential_tests {
-    use super::*;
-    use async_trait::async_trait;
-    use std::sync::{Arc, Mutex};
-    struct FakeProvider(Mutex<Vec<providers::ChatRequest>>);
-    #[async_trait]
-    impl providers::ChatProvider for FakeProvider {
-        async fn chat(
-            &self,
-            request: providers::ChatRequest,
-        ) -> Result<providers::ChatResponse, providers::ProviderError> {
-            self.0.lock().unwrap().push(request);
-            Ok(providers::ChatResponse {
-                message: providers::ChatMessage::text(
-                    providers::ChatRole::Assistant,
-                    "synthetic response",
-                ),
-                model: "model".into(),
-                stop_reason: StopReason::EndTurn,
-                usage: None,
-            })
-        }
-        async fn stream_chat(
-            &self,
-            _: providers::ChatRequest,
-            _: tokio::sync::mpsc::Sender<providers::ProviderEvent>,
-        ) -> Result<providers::ChatResponse, providers::ProviderError> {
-            Err(providers::ProviderError::Unavailable)
-        }
-    }
-    struct FakeResolver(Arc<FakeProvider>);
-    #[async_trait]
-    impl providers::ChatProviderResolver for FakeResolver {
-        async fn resolve(
-            &self,
-            _: &str,
-            _: Option<&str>,
-        ) -> Result<ResolvedChatProvider, providers::ProviderError> {
-            Ok(ResolvedChatProvider {
-                provider: self.0.clone(),
-                model: "selected-model".into(),
-            })
-        }
-    }
-    #[tokio::test]
-    async fn credential_legacy_tool_facade_uses_injected_provider_and_latest_image_attachment() {
-        let fake = Arc::new(FakeProvider(Mutex::new(vec![])));
-        let context = ToolContext::new(
-            "session".into(),
-            "actor".into(),
-            None,
-            None,
-            vec![],
-            |_, _| {},
-        );
-        assert!(ToolChatClient::for_context(&context).await.is_err()); // No global/Config fallback.
-        let context = context.with_provider_resolver(Arc::new(FakeResolver(fake.clone())));
-        let client = ToolChatClient::for_context(&context).await.unwrap();
-        let message = |text: &str| ToolChatMessage {
-            role: "user".into(),
-            content: text.into(),
-            tool_calls: None,
-            tool_call_id: None,
-        };
-        let attachment = ToolAttachment {
-            id: "image".into(),
-            name: "Synthetic".into(),
-            kind: "image".into(),
-            mime_type: "image/png".into(),
-            size: 4,
-            text_content: None,
-            data_url: Some("aGVsbG8=".into()),
-        };
-        let response = client
-            .chat_with_attachments(
-                &[message("history"), message("latest")],
-                None,
-                Some(&[attachment]),
-            )
-            .await
-            .unwrap();
-        assert!(response.choices[0].message.content.as_deref() == Some("synthetic response"));
-        let requests = fake.0.lock().unwrap();
-        assert!(requests[0].model == "selected-model");
-        assert!(requests[0].messages[0].content.len() == 1);
-        assert!(requests[0].messages[1].content.iter().any(
-            |p| matches!(p, ContentPart::ImageUrl(url) if url == "data:image/png;base64,aGVsbG8=")
-        ));
-    }
-}
-
 pub(super) struct ToolChatClient {
     resolved: ResolvedChatProvider,
 }
@@ -413,14 +321,105 @@ impl ToolChatClient {
             (cleaned.find('{'), cleaned.rfind('}')),
             (cleaned.find('['), cleaned.rfind(']')),
         ] {
-            if let (Some(start), Some(end)) = (start, end) {
-                if end > start {
-                    if let Ok(value) = serde_json::from_str(&cleaned[start..=end]) {
-                        return Ok(value);
-                    }
-                }
+            if let (Some(start), Some(end)) = (start, end)
+                && end > start
+                && let Ok(value) = serde_json::from_str(&cleaned[start..=end])
+            {
+                return Ok(value);
             }
         }
         Err(anyhow!("模型未返回可解析 JSON"))
+    }
+}
+
+#[cfg(test)]
+mod credential_tests {
+    use super::*;
+    use async_trait::async_trait;
+    use std::sync::{Arc, Mutex};
+    struct FakeProvider(Mutex<Vec<providers::ChatRequest>>);
+    #[async_trait]
+    impl providers::ChatProvider for FakeProvider {
+        async fn chat(
+            &self,
+            request: providers::ChatRequest,
+        ) -> Result<providers::ChatResponse, providers::ProviderError> {
+            self.0.lock().unwrap().push(request);
+            Ok(providers::ChatResponse {
+                message: providers::ChatMessage::text(
+                    providers::ChatRole::Assistant,
+                    "synthetic response",
+                ),
+                model: "model".into(),
+                stop_reason: StopReason::EndTurn,
+                usage: None,
+            })
+        }
+        async fn stream_chat(
+            &self,
+            _: providers::ChatRequest,
+            _: tokio::sync::mpsc::Sender<providers::ProviderEvent>,
+        ) -> Result<providers::ChatResponse, providers::ProviderError> {
+            Err(providers::ProviderError::Unavailable)
+        }
+    }
+    struct FakeResolver(Arc<FakeProvider>);
+    #[async_trait]
+    impl providers::ChatProviderResolver for FakeResolver {
+        async fn resolve(
+            &self,
+            _: &str,
+            _: Option<&str>,
+        ) -> Result<ResolvedChatProvider, providers::ProviderError> {
+            Ok(ResolvedChatProvider {
+                provider: self.0.clone(),
+                model: "selected-model".into(),
+            })
+        }
+    }
+    #[tokio::test]
+    async fn credential_legacy_tool_facade_uses_injected_provider_and_latest_image_attachment() {
+        let fake = Arc::new(FakeProvider(Mutex::new(vec![])));
+        let context = ToolContext::new(
+            "session".into(),
+            "actor".into(),
+            None,
+            None,
+            vec![],
+            |_, _| {},
+        );
+        assert!(ToolChatClient::for_context(&context).await.is_err()); // No global/Config fallback.
+        let context = context.with_provider_resolver(Arc::new(FakeResolver(fake.clone())));
+        let client = ToolChatClient::for_context(&context).await.unwrap();
+        let message = |text: &str| ToolChatMessage {
+            role: "user".into(),
+            content: text.into(),
+            tool_calls: None,
+            tool_call_id: None,
+        };
+        let attachment = ToolAttachment {
+            id: "image".into(),
+            name: "Synthetic".into(),
+            kind: "image".into(),
+            mime_type: "image/png".into(),
+            size: 4,
+            text_content: None,
+            data_url: Some("aGVsbG8=".into()),
+        };
+        let response = client
+            .chat_with_attachments(
+                &[message("history"), message("latest")],
+                None,
+                Some(&[attachment]),
+            )
+            .await
+            .unwrap();
+        assert!(response.choices[0].message.content.as_deref() == Some("synthetic response"));
+        let requests = fake.0.lock().unwrap();
+        assert!(requests[0].model == "selected-model");
+        assert!(requests[0].messages[0].content.len() == 1);
+        assert!(requests[0].messages[1].content.iter().any(
+            |p| matches!(p, ContentPart::ImageUrl(url) if url == "data:image/png;base64,aGVsbG8=")
+        ));
     }
 }

@@ -313,7 +313,7 @@ impl OfficeTool for DocGenerateTool {
     }
 }
 
-pub fn sections_to_markdown(doc: &DocOutput) -> String {
+fn sections_to_markdown(doc: &DocOutput) -> String {
     let mut md = format!("# {}\n\n", doc.title);
     for section in &doc.sections {
         let prefix = "#".repeat(section.heading_level.min(6) as usize);

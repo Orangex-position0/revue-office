@@ -307,12 +307,12 @@ mod tests {
             session_id: &str,
             owner_id: &str,
         ) -> Result<bool, SessionRepositoryError> {
-            if !self
+            if self
                 .conversations
                 .lock()
                 .unwrap()
                 .get(session_id)
-                .is_some_and(|conversation| conversation.owner_id == owner_id)
+                .is_none_or(|conversation| conversation.owner_id != owner_id)
             {
                 return Ok(false);
             }

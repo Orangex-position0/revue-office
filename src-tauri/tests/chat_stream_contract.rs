@@ -21,6 +21,28 @@ fn ready_artifact() -> ArtifactPublication {
 }
 
 #[test]
+fn artifact_events_keep_a_compact_layout_and_unchanged_wire_payload() {
+    assert!(
+        std::mem::size_of::<ApplicationEvent>() < std::mem::size_of::<ArtifactPublication>(),
+        "artifact publications should not be stored inline in every application event"
+    );
+
+    let artifact = ready_artifact();
+    let event = ApplicationEvent::ArtifactUpdated {
+        artifact: Box::new(artifact.clone()),
+        artifacts: vec![artifact.clone()],
+    };
+    let wire = serde_json::to_value(&event).unwrap();
+    assert_eq!(wire["type"], "artifact_updated");
+    assert_eq!(wire["artifact"], serde_json::to_value(&artifact).unwrap());
+    assert_eq!(wire["artifacts"], serde_json::json!([artifact]));
+    assert_eq!(
+        serde_json::from_value::<ApplicationEvent>(wire).unwrap(),
+        event
+    );
+}
+
+#[test]
 fn chat_stream_contract_preserves_public_event_names_and_key_fields() {
     let cases = vec![
         (
@@ -56,7 +78,7 @@ fn chat_stream_contract_preserves_public_event_names_and_key_fields() {
         ),
         (
             ApplicationEvent::ArtifactUpdated {
-                artifact: ready_artifact(),
+                artifact: Box::new(ready_artifact()),
                 artifacts: vec![ready_artifact()],
             },
             "artifact_update",

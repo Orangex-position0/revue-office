@@ -428,7 +428,7 @@ fn download_response(bytes: Vec<u8>, filename: &str) -> Result<Response, AppErro
 }
 fn base64_encode(data: &[u8]) -> String {
     const C: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-    let mut out = String::with_capacity((data.len() + 2) / 3 * 4);
+    let mut out = String::with_capacity(data.len().div_ceil(3) * 4);
     for chunk in data.chunks(3) {
         let b = [
             chunk[0],

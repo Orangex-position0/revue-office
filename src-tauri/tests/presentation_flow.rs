@@ -182,7 +182,7 @@ async fn presentation_flow_emits_compatible_progress_and_publishes_before_done()
         application_event_frame(
             &session.id,
             ApplicationEvent::ArtifactUpdated {
-                artifact: publication.clone(),
+                artifact: Box::new(publication.clone()),
                 artifacts: vec![publication.clone()],
             },
         )

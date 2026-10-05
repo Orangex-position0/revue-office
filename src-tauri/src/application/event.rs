@@ -21,7 +21,7 @@ pub enum ApplicationEvent {
         slide: serde_json::Value,
     },
     ArtifactUpdated {
-        artifact: ArtifactPublication,
+        artifact: Box<ArtifactPublication>,
         artifacts: Vec<ArtifactPublication>,
     },
     Message {

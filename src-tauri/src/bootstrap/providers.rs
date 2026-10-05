@@ -140,6 +140,11 @@ fn select_model(
         })
         .unwrap_or_else(|| profile.default_model.clone())
 }
+fn is_chat_compatible_model(model: &str) -> bool {
+    let model = model.trim().to_lowercase();
+    !(model.starts_with("agnes-image-") || model.starts_with("agnes-video-"))
+}
+
 #[cfg(test)]
 mod credential_tests {
     use super::*;
@@ -217,9 +222,4 @@ mod credential_tests {
             Err(ProviderError::Unavailable)
         ));
     }
-}
-
-fn is_chat_compatible_model(model: &str) -> bool {
-    let model = model.trim().to_lowercase();
-    !(model.starts_with("agnes-image-") || model.starts_with("agnes-video-"))
 }

@@ -298,15 +298,14 @@ impl AssetContentExtractor for FakeExtractor {
     }
 }
 
-fn service(
-    fail_create: bool,
-    fail_delete: bool,
-) -> (
+type AssetTestService = (
     Arc<AssetApplicationService>,
     Arc<FakeRepository>,
     Arc<FakeStorage>,
     Arc<Mutex<Vec<&'static str>>>,
-) {
+);
+
+fn service(fail_create: bool, fail_delete: bool) -> AssetTestService {
     let events = Arc::new(Mutex::new(Vec::new()));
     let repository = Arc::new(FakeRepository {
         fail_create: Mutex::new(fail_create),

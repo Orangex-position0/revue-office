@@ -44,9 +44,9 @@ impl Canvas {
         }
         let clamped_alpha = alpha.clamp(0.0, 1.0);
         let offset = ((row as u32 * self.width + column as u32) * 3) as usize;
-        for channel in 0..3 {
+        for (channel, component) in color.iter().enumerate() {
             let base = self.pixels[offset + channel] as f32;
-            let blended = base * (1.0 - clamped_alpha) + color[channel] as f32 * clamped_alpha;
+            let blended = base * (1.0 - clamped_alpha) + *component as f32 * clamped_alpha;
             self.pixels[offset + channel] = blended.round().clamp(0.0, 255.0) as u8;
         }
     }

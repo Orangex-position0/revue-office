@@ -255,18 +255,30 @@ fn palette(theme: &str, index: usize) -> (&'static str, &'static str, &'static s
     match theme {
         "tech" => (
             "0B1120",
-            if index % 2 == 0 { "22D3EE" } else { "A78BFA" },
+            if index.is_multiple_of(2) {
+                "22D3EE"
+            } else {
+                "A78BFA"
+            },
             "F8FAFC",
         ),
         "warm" => (
             "FFF7ED",
-            if index % 2 == 0 { "EA580C" } else { "D97706" },
+            if index.is_multiple_of(2) {
+                "EA580C"
+            } else {
+                "D97706"
+            },
             "431407",
         ),
         "minimal" => ("FFFFFF", "71717A", "18181B"),
         _ => (
             "F8FAFC",
-            if index % 2 == 0 { "2563EB" } else { "0F766E" },
+            if index.is_multiple_of(2) {
+                "2563EB"
+            } else {
+                "0F766E"
+            },
             "0F172A",
         ),
     }

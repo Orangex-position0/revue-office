@@ -18,6 +18,8 @@ pub struct ToolAttachment {
     pub data_url: Option<String>,
 }
 
+pub type ToolProgressEmitter = Arc<dyn Fn(&str, serde_json::Value) + Send + Sync>;
+
 /// 工具执行上下文
 #[derive(Clone)]
 pub struct ToolContext {
@@ -28,7 +30,7 @@ pub struct ToolContext {
     pub preferred_model: Option<String>,
     pub attachments: Vec<ToolAttachment>,
     /// SSE 推送回调（向前端发送实时进度）
-    pub emit: Arc<dyn Fn(&str, serde_json::Value) + Send + Sync>,
+    pub emit: ToolProgressEmitter,
     /// 共享上下文（跨工具传递，如 PPT 大纲规划）
     pub scratchpad: Arc<Mutex<HashMap<String, serde_json::Value>>>,
     /// 用户工具配置（前端传入，如视频时长、宽高比等）

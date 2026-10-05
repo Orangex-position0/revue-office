@@ -327,12 +327,12 @@ fn extract_xlsx_structured(bytes: &[u8]) -> Result<Value> {
         }
 
         for cap in sheet_re.captures_iter(xml) {
-            if let (Some(name), Some(r_id)) = (cap.get(1), cap.get(2)) {
-                if let Some(target) = rels_map.get(r_id.as_str()) {
-                    // target 形如 "worksheets/sheet1.xml"
-                    let full_path = format!("xl/{}", target);
-                    sheet_display_names.insert(full_path, name.as_str().to_string());
-                }
+            if let (Some(name), Some(r_id)) = (cap.get(1), cap.get(2))
+                && let Some(target) = rels_map.get(r_id.as_str())
+            {
+                // target 形如 "worksheets/sheet1.xml"
+                let full_path = format!("xl/{}", target);
+                sheet_display_names.insert(full_path, name.as_str().to_string());
             }
         }
     }

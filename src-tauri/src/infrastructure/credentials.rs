@@ -77,6 +77,20 @@ async fn verify_backend(store: &dyn CredentialStore) -> Result<(), CredentialErr
     Ok(())
 }
 
+pub fn startup_scope(purpose: CredentialPurpose) -> CredentialScope {
+    CredentialScope {
+        actor_id: STARTUP_ACTOR.into(),
+        profile_id: "default".into(),
+        provider_id: if purpose == CredentialPurpose::WebSearch {
+            "baidu-mcp"
+        } else {
+            "openai-compatible"
+        }
+        .into(),
+        purpose,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -143,19 +157,5 @@ mod tests {
             store.set_failures(failure);
             assert!(verify_backend(&store).await.is_err());
         }
-    }
-}
-
-pub fn startup_scope(purpose: CredentialPurpose) -> CredentialScope {
-    CredentialScope {
-        actor_id: STARTUP_ACTOR.into(),
-        profile_id: "default".into(),
-        provider_id: if purpose == CredentialPurpose::WebSearch {
-            "baidu-mcp"
-        } else {
-            "openai-compatible"
-        }
-        .into(),
-        purpose,
     }
 }

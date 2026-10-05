@@ -327,14 +327,14 @@ async fn search_web(
                         search_with_duckduckgo(&client, query, max_results).await
                     }
                 };
-                if let Ok(results) = result {
-                    if !results.is_empty() {
-                        return Ok(SearchOutcome {
-                            provider: attempt,
-                            items: results,
-                            providers_tried: tried,
-                        });
-                    }
+                if let Ok(results) = result
+                    && !results.is_empty()
+                {
+                    return Ok(SearchOutcome {
+                        provider: attempt,
+                        items: results,
+                        providers_tried: tried,
+                    });
                 }
             }
             Ok(SearchOutcome {

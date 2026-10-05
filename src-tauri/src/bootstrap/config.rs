@@ -378,7 +378,7 @@ fn env_or_required(key: &'static str) -> Result<String> {
 
 fn split_env_list(value: &str) -> Vec<String> {
     value
-        .split(|character| matches!(character, ',' | ';' | '\n'))
+        .split([',', ';', '\n'])
         .map(str::trim)
         .filter(|item| !item.is_empty())
         .map(str::to_owned)

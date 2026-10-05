@@ -161,24 +161,24 @@ impl AssetApplicationService {
         id: AssetId,
     ) -> Result<(Asset, ExtractedText), AssetError> {
         let asset = self.get(actor, id).await?;
-        if let Some(metadata) = &asset.metadata {
-            if let Some(text) = metadata.get("extracted_text").and_then(|v| v.as_str()) {
-                return Ok((
-                    asset.clone(),
-                    ExtractedText {
-                        text: text.into(),
-                        parser: metadata
-                            .get("text_parser")
-                            .and_then(|v| v.as_str())
-                            .unwrap_or("stored")
-                            .into(),
-                        truncated: metadata
-                            .get("text_truncated")
-                            .and_then(|v| v.as_bool())
-                            .unwrap_or(false),
-                    },
-                ));
-            }
+        if let Some(metadata) = &asset.metadata
+            && let Some(text) = metadata.get("extracted_text").and_then(|v| v.as_str())
+        {
+            return Ok((
+                asset.clone(),
+                ExtractedText {
+                    text: text.into(),
+                    parser: metadata
+                        .get("text_parser")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("stored")
+                        .into(),
+                    truncated: metadata
+                        .get("text_truncated")
+                        .and_then(|v| v.as_bool())
+                        .unwrap_or(false),
+                },
+            ));
         }
         let bytes = self
             .storage

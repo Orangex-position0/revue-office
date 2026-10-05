@@ -44,28 +44,6 @@ fn encode(value: &CredentialSet) -> Result<Zeroizing<String>, CredentialError> {
         .map(Zeroizing::new)
         .map_err(|_| CredentialError::Unavailable)
 }
-#[cfg(test)]
-mod tests {
-    use super::*;
-    #[test]
-    fn credential_native_payload_roundtrip_and_scope_digest_need_no_native_access() {
-        let scope = CredentialScope::chat("actor", "profile");
-        let mut value = CredentialSet::new([SecretString::new("synthetic-native-payload".into())]);
-        value.bind_endpoint("https://example.invalid/v1");
-        let payload = encode(&value).unwrap();
-        let restored = decode(payload.to_string()).unwrap();
-        assert!(restored.same_values(&value));
-        assert!(restored.revision() == value.revision());
-        assert!(restored.matches_endpoint("https://example.invalid/v1"));
-        assert!(!restored.matches_endpoint("https://other.invalid/v1"));
-        assert!(
-            NativeCredentialStore::account(&scope)
-                != NativeCredentialStore::account(&CredentialScope::chat("other", "profile"))
-        );
-        assert!(decode("invalid synthetic payload".into()).is_err());
-    }
-}
-
 fn decode(raw: String) -> Result<CredentialSet, CredentialError> {
     let raw = Zeroizing::new(raw);
     let (version, revision, binding, values): (u8, String, Option<String>, Vec<String>) =
@@ -124,5 +102,27 @@ impl CredentialStore for NativeCredentialStore {
         })
         .await
         .map_err(|_| CredentialError::Unavailable)?
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn credential_native_payload_roundtrip_and_scope_digest_need_no_native_access() {
+        let scope = CredentialScope::chat("actor", "profile");
+        let mut value = CredentialSet::new([SecretString::new("synthetic-native-payload".into())]);
+        value.bind_endpoint("https://example.invalid/v1");
+        let payload = encode(&value).unwrap();
+        let restored = decode(payload.to_string()).unwrap();
+        assert!(restored.same_values(&value));
+        assert!(restored.revision() == value.revision());
+        assert!(restored.matches_endpoint("https://example.invalid/v1"));
+        assert!(!restored.matches_endpoint("https://other.invalid/v1"));
+        assert!(
+            NativeCredentialStore::account(&scope)
+                != NativeCredentialStore::account(&CredentialScope::chat("other", "profile"))
+        );
+        assert!(decode("invalid synthetic payload".into()).is_err());
     }
 }

@@ -71,12 +71,11 @@ fn extract_json(text: &str) -> Result<serde_json::Value, PresentationPlannerErro
     if let Ok(value) = serde_json::from_str(cleaned) {
         return Ok(value);
     }
-    if let (Some(start), Some(end)) = (cleaned.find('{'), cleaned.rfind('}')) {
-        if end > start {
-            if let Ok(value) = serde_json::from_str(&cleaned[start..=end]) {
-                return Ok(value);
-            }
-        }
+    if let (Some(start), Some(end)) = (cleaned.find('{'), cleaned.rfind('}'))
+        && end > start
+        && let Ok(value) = serde_json::from_str(&cleaned[start..=end])
+    {
+        return Ok(value);
     }
     Err(PresentationPlannerError::InvalidResponse(
         "model did not return a JSON object".into(),
