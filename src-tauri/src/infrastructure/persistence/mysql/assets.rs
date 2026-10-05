@@ -84,7 +84,9 @@ impl AssetRepository for MySqlAssetRepository {
     }
     async fn get(&self, owner: &ActorId, id: &AssetId) -> Result<Option<Asset>, AssetError> {
         let sql = format!("SELECT {FILE_COLUMNS} FROM files WHERE id = ? AND owner_id = ?");
-        let row = sqlx::query(&sql)
+        let mut sql = sqlx::QueryBuilder::<sqlx::MySql>::new(sql);
+        let row = sql
+            .build()
             .bind(&id.0)
             .bind(&owner.0)
             .fetch_optional(&self.pool)
@@ -108,7 +110,8 @@ impl AssetRepository for MySqlAssetRepository {
                 None,
             )
         };
-        let mut query = sqlx::query(&sql).bind(&q.owner_id.0);
+        let mut sql = sqlx::QueryBuilder::<sqlx::MySql>::new(sql);
+        let mut query = sql.build().bind(&q.owner_id.0);
         if let Some(folder) = folder {
             query = query.bind(folder);
         }
@@ -125,7 +128,8 @@ impl AssetRepository for MySqlAssetRepository {
         let sql = format!(
             "SELECT {FILE_COLUMNS} FROM files WHERE owner_id = ? AND (? = '%%' OR name LIKE ? OR COALESCE(description, '') LIKE ?) ORDER BY updated_at DESC"
         );
-        sqlx::query(&sql)
+        let mut sql = sqlx::QueryBuilder::<sqlx::MySql>::new(sql);
+        sql.build()
             .bind(&q.owner_id.0)
             .bind(&pattern)
             .bind(&pattern)

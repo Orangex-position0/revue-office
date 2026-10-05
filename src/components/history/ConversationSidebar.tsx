@@ -1,8 +1,35 @@
-import { Bot, BrainCircuit, ChevronDown, Clapperboard, Edit3, FileText, Folder, Github, Image, LayoutDashboard, LogOut, MessageSquare, MoreHorizontal, PenTool, Plus, Search, Settings2, Sheet, Sparkles, Trash2 } from 'lucide-react'
+import {
+  Bot,
+  BrainCircuit,
+  ChevronDown,
+  Clapperboard,
+  Edit3,
+  FileText,
+  Folder,
+  Github,
+  Image,
+  LayoutDashboard,
+  LogOut,
+  MessageSquare,
+  MoreHorizontal,
+  PenTool,
+  Plus,
+  Search,
+  Settings2,
+  Sheet,
+  Sparkles,
+  Trash2,
+} from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import type { CSSProperties, DragEvent } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import type { ChatMessage, ConversationRecord, PPTProject, ToolKind, ProjectMeta } from '@/types'
+import type {
+  ChatMessage,
+  ConversationRecord,
+  PPTProject,
+  ToolKind,
+  ProjectMeta,
+} from '@/types'
 
 const LOGO_URL = '/logo.png'
 
@@ -22,7 +49,11 @@ interface ConversationSidebarProps {
   onRenameConversation?: (id: string, title: string) => void
   onDeleteConversation?: (id: string) => void
   onDeleteProject?: (projectId: string) => void
-  onMoveConversation?: (id: string, projectId: string | null, beforeId?: string | null) => void
+  onMoveConversation?: (
+    id: string,
+    projectId: string | null,
+    beforeId?: string | null,
+  ) => void
   onLogout?: () => void
   onOpenSettings?: () => void
   searchQuery?: string
@@ -69,7 +100,8 @@ function formatTime(value?: string) {
   const d = new Date(value)
   if (Number.isNaN(d.getTime())) return ''
   const now = new Date()
-  if (d.toDateString() === now.toDateString()) return d.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
+  if (d.toDateString() === now.toDateString())
+    return d.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
   return d.toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' })
 }
 
@@ -86,7 +118,11 @@ function includesKeyword(value: string | undefined, keyword: string) {
 }
 
 function sortConversations(items: ConversationRecord[]) {
-  return [...items].sort((a, b) => (a.order_col || 0) - (b.order_col || 0) || Date.parse(b.updated_at || '') - Date.parse(a.updated_at || ''))
+  return [...items].sort(
+    (a, b) =>
+      (a.order_col || 0) - (b.order_col || 0) ||
+      Date.parse(b.updated_at || '') - Date.parse(a.updated_at || ''),
+  )
 }
 
 export function ConversationSidebar({
@@ -114,11 +150,16 @@ export function ConversationSidebar({
 }: ConversationSidebarProps) {
   const navigate = useNavigate()
   const location = useLocation()
-  const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set())
+  const [expandedProjects, setExpandedProjects] = useState<Set<string>>(
+    new Set(),
+  )
   const [showUnassigned, setShowUnassigned] = useState(true)
   const [hovered, setHovered] = useState<string | null>(null)
   const [draggingId, setDraggingId] = useState<string | null>(null)
-  const [dropTarget, setDropTarget] = useState<{ projectId: string | null; beforeId: string | null } | null>(null)
+  const [dropTarget, setDropTarget] = useState<{
+    projectId: string | null
+    beforeId: string | null
+  } | null>(null)
   const [unassignedLimit, setUnassignedLimit] = useState(5)
 
   useEffect(() => {
@@ -133,46 +174,79 @@ export function ConversationSidebar({
 
   const latestMessage = messages[messages.length - 1]
   const conversationTitle = project?.title || firstUserPrompt(messages)
-  const shouldShowDraftConversation = messages.length > 0 && !activeConversationId
+  const shouldShowDraftConversation =
+    messages.length > 0 && !activeConversationId
   const currentConversations = shouldShowDraftConversation
-    ? [{
-        id: 'current',
-        title: conversationTitle,
-        tool: activeTool,
-        summary: latestMessage?.content || '正在处理当前任务...',
-        updated_at: latestMessage?.timestamp || new Date().toISOString(),
-        message_count: messages.length,
-        project_id: activeProjectId || undefined,
-      } as ConversationRecord, ...conversations.filter((item) => item.id !== 'current')]
+    ? [
+        {
+          id: 'current',
+          title: conversationTitle,
+          tool: activeTool,
+          summary: latestMessage?.content || '正在处理当前任务...',
+          updated_at: latestMessage?.timestamp || new Date().toISOString(),
+          message_count: messages.length,
+          project_id: activeProjectId || undefined,
+        } as ConversationRecord,
+        ...conversations.filter((item) => item.id !== 'current'),
+      ]
     : conversations
 
-  const { filteredProjects, unassignedConversations, conversationsByProject } = useMemo(() => {
-    const keyword = searchQuery.trim()
-    const filteredProjects = keyword
-      ? projects.filter((proj) => includesKeyword(proj.title, keyword) || includesKeyword(proj.description, keyword))
-      : projects
-    const filteredConversations = keyword
-      ? currentConversations.filter((item) =>
-          includesKeyword(item.title, keyword)
-          || includesKeyword(item.summary, keyword)
-          || includesKeyword(item.project_title, keyword)
+  const { filteredProjects, unassignedConversations, conversationsByProject } =
+    useMemo(() => {
+      const keyword = searchQuery.trim()
+      const filteredProjects = keyword
+        ? projects.filter(
+            (proj) =>
+              includesKeyword(proj.title, keyword) ||
+              includesKeyword(proj.description, keyword),
+          )
+        : projects
+      const filteredConversations = keyword
+        ? currentConversations.filter(
+            (item) =>
+              includesKeyword(item.title, keyword) ||
+              includesKeyword(item.summary, keyword) ||
+              includesKeyword(item.project_title, keyword),
+          )
+        : currentConversations
+      const byProject = new Map<string, ConversationRecord[]>()
+      for (const proj of filteredProjects) {
+        byProject.set(
+          proj.id,
+          sortConversations(
+            filteredConversations.filter((c) => c.project_id === proj.id),
+          ),
         )
-      : currentConversations
-    const byProject = new Map<string, ConversationRecord[]>()
-    for (const proj of filteredProjects) {
-      byProject.set(proj.id, sortConversations(filteredConversations.filter((c) => c.project_id === proj.id)))
-    }
-    return {
-      filteredProjects,
-      unassignedConversations: sortConversations(filteredConversations.filter((c) => !c.project_id)),
-      conversationsByProject: byProject,
-    }
-  }, [projects, currentConversations, searchQuery])
+      }
+      return {
+        filteredProjects,
+        unassignedConversations: sortConversations(
+          filteredConversations.filter((c) => !c.project_id),
+        ),
+        conversationsByProject: byProject,
+      }
+    }, [projects, currentConversations, searchQuery])
 
   const workspaceLinks = [
-    { to: '/', label: '智能助手', icon: Sparkles, active: location.pathname === '/' },
-    { to: '/files', label: '我的文件', icon: Folder, active: location.pathname.startsWith('/files') },
-    { to: 'https://github.com/fuzhengwei/revueOffice', label: '开源项目', icon: Github, active: false, external: true },
+    {
+      to: '/',
+      label: '智能助手',
+      icon: Sparkles,
+      active: location.pathname === '/',
+    },
+    {
+      to: '/files',
+      label: '我的文件',
+      icon: Folder,
+      active: location.pathname.startsWith('/files'),
+    },
+    {
+      to: 'https://github.com/fuzhengwei/revueOffice',
+      label: '开源项目',
+      icon: Github,
+      active: false,
+      external: true,
+    },
   ]
 
   const toggleProject = (id: string) => {
@@ -190,14 +264,21 @@ export function ConversationSidebar({
     onRenameConversation?.(item.id, nextTitle)
   }
 
-  const handleDragStart = (event: DragEvent<HTMLDivElement>, item: ConversationRecord) => {
+  const handleDragStart = (
+    event: DragEvent<HTMLDivElement>,
+    item: ConversationRecord,
+  ) => {
     if (item.id === 'current') return
     event.dataTransfer.effectAllowed = 'move'
     event.dataTransfer.setData('text/plain', item.id)
     setDraggingId(item.id)
   }
 
-  const handleDragOver = (event: DragEvent<HTMLElement>, projectId: string | null, beforeId: string | null = null) => {
+  const handleDragOver = (
+    event: DragEvent<HTMLElement>,
+    projectId: string | null,
+    beforeId: string | null = null,
+  ) => {
     if (!draggingId || draggingId === beforeId) return
     event.preventDefault()
     event.stopPropagation()
@@ -205,7 +286,11 @@ export function ConversationSidebar({
     setDropTarget({ projectId, beforeId })
   }
 
-  const handleDrop = (event: DragEvent<HTMLElement>, projectId: string | null, beforeId: string | null = null) => {
+  const handleDrop = (
+    event: DragEvent<HTMLElement>,
+    projectId: string | null,
+    beforeId: string | null = null,
+  ) => {
     event.preventDefault()
     event.stopPropagation()
     const id = event.dataTransfer.getData('text/plain') || draggingId
@@ -223,12 +308,15 @@ export function ConversationSidebar({
     setDropTarget(null)
   }
 
-  const isDropTarget = (projectId: string | null, beforeId: string | null = null) => (
-    dropTarget?.projectId === projectId && dropTarget.beforeId === beforeId
-  )
+  const isDropTarget = (
+    projectId: string | null,
+    beforeId: string | null = null,
+  ) => dropTarget?.projectId === projectId && dropTarget.beforeId === beforeId
 
   const renderConversationItem = (item: ConversationRecord, child = false) => {
-    const active = activeConversationId ? item.id === activeConversationId : item.id === 'current'
+    const active = activeConversationId
+      ? item.id === activeConversationId
+      : item.id === 'current'
     const Icon = iconMap[item.tool] || MessageSquare
 
     if (child) {
@@ -237,37 +325,62 @@ export function ConversationSidebar({
           key={item.id}
           draggable={item.id !== 'current'}
           onDragStart={(event) => handleDragStart(event, item)}
-          onDragOver={(event) => handleDragOver(event, item.project_id || null, item.id)}
-          onDrop={(event) => handleDrop(event, item.project_id || null, item.id)}
+          onDragOver={(event) =>
+            handleDragOver(event, item.project_id || null, item.id)
+          }
+          onDrop={(event) =>
+            handleDrop(event, item.project_id || null, item.id)
+          }
           onDragEnd={handleDragEnd}
           onMouseEnter={() => setHovered(item.id)}
           onMouseLeave={() => setHovered(null)}
           className={`group relative pl-3 ${draggingId === item.id ? 'opacity-45' : ''}`}
         >
-          {isDropTarget(item.project_id || null, item.id) && <div className="mb-1 ml-2 h-0.5 rounded-full bg-surface-950/35" />}
+          {isDropTarget(item.project_id || null, item.id) && (
+            <div className="mb-1 ml-2 h-0.5 rounded-full bg-surface-950/35" />
+          )}
           <div className="absolute left-0 top-0 h-full w-px bg-black/[0.06]" />
           <div className={`absolute left-0 top-1/2 h-px w-2 bg-black/[0.06]`} />
           <button
             type="button"
-            onClick={() => item.id !== 'current' && onSelectConversation?.(item.id)}
+            onClick={() =>
+              item.id !== 'current' && onSelectConversation?.(item.id)
+            }
             className={`flex w-full min-w-0 items-center gap-2 rounded-xl px-2 py-1.5 text-left transition-all ${active ? 'bg-surface-950/5 ring-1 ring-surface-950/10' : 'hover:bg-white/55'}`}
           >
-            <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${toolColors[item.tool] || 'bg-surface-400'}`} />
+            <span
+              className={`h-1.5 w-1.5 shrink-0 rounded-full ${toolColors[item.tool] || 'bg-surface-400'}`}
+            />
             <span className="min-w-0 flex-1 truncate text-[11px] font-semibold leading-4 text-surface-650">
               {trimTitle(item.title)}
             </span>
-            <span className="shrink-0 text-[9px] font-medium text-surface-400">{formatTime(item.updated_at) || '刚刚'}</span>
+            <span className="shrink-0 text-[9px] font-medium text-surface-400">
+              {formatTime(item.updated_at) || '刚刚'}
+            </span>
           </button>
 
           {item.id !== 'current' && hovered === item.id && (
-            <div className="absolute right-1 top-1/2 flex -translate-y-1/2 items-center gap-1 rounded-full bg-[#f7f2e8]/95 p-0.5 shadow-sm ring-1 ring-black/[0.06]" onClick={(e) => e.stopPropagation()}>
+            <div
+              className="absolute right-1 top-1/2 flex -translate-y-1/2 items-center gap-1 rounded-full bg-[#f7f2e8]/95 p-0.5 shadow-sm ring-1 ring-black/[0.06]"
+              onClick={(e) => e.stopPropagation()}
+            >
               {onRenameConversation && (
-                <button type="button" onClick={() => handleRenameConversation(item)} className="rounded-full p-1 text-surface-400 hover:bg-white hover:text-surface-800" title="修改标题">
+                <button
+                  type="button"
+                  onClick={() => handleRenameConversation(item)}
+                  className="rounded-full p-1 text-surface-400 hover:bg-white hover:text-surface-800"
+                  title="修改标题"
+                >
                   <Edit3 className="h-2.5 w-2.5" />
                 </button>
               )}
               {onDeleteConversation && (
-                <button type="button" onClick={() => onDeleteConversation(item.id)} className="rounded-full p-1 text-red-400 hover:bg-red-50 hover:text-red-600" title="删除对话">
+                <button
+                  type="button"
+                  onClick={() => onDeleteConversation(item.id)}
+                  className="rounded-full p-1 text-red-400 hover:bg-red-50 hover:text-red-600"
+                  title="删除对话"
+                >
                   <Trash2 className="h-2.5 w-2.5" />
                 </button>
               )}
@@ -282,45 +395,72 @@ export function ConversationSidebar({
         key={item.id}
         draggable={item.id !== 'current'}
         onDragStart={(event) => handleDragStart(event, item)}
-        onDragOver={(event) => handleDragOver(event, item.project_id || null, item.id)}
+        onDragOver={(event) =>
+          handleDragOver(event, item.project_id || null, item.id)
+        }
         onDrop={(event) => handleDrop(event, item.project_id || null, item.id)}
         onDragEnd={handleDragEnd}
         onMouseEnter={() => setHovered(item.id)}
         onMouseLeave={() => setHovered(null)}
         className={`group relative overflow-hidden rounded-[1.35rem] transition-all duration-200 ${draggingId === item.id ? 'opacity-45' : ''} ${isDropTarget(item.project_id || null, item.id) ? 'ring-2 ring-surface-950/20' : ''} ${active ? 'bg-white shadow-[0_16px_38px_rgba(24,24,27,0.08)] ring-1 ring-black/[0.06]' : 'bg-white/38 hover:-translate-y-0.5 hover:bg-white/72 hover:shadow-[0_14px_30px_rgba(24,24,27,0.06)]'}`}
       >
-        {active && <div className="absolute inset-y-3 left-0 w-1 rounded-r-full bg-surface-950" />}
+        {active && (
+          <div className="absolute inset-y-3 left-0 w-1 rounded-r-full bg-surface-950" />
+        )}
         <button
           type="button"
-          onClick={() => item.id !== 'current' && onSelectConversation?.(item.id)}
+          onClick={() =>
+            item.id !== 'current' && onSelectConversation?.(item.id)
+          }
           className="flex w-full min-w-0 items-center gap-3 px-3 py-3 text-left"
         >
-          <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl transition-all ${active ? 'bg-surface-950 text-white shadow-[0_10px_24px_rgba(24,24,27,0.18)]' : 'bg-white/90 text-surface-500 ring-1 ring-black/[0.06] group-hover:text-surface-800'}`}>
+          <div
+            className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl transition-all ${active ? 'bg-surface-950 text-white shadow-[0_10px_24px_rgba(24,24,27,0.18)]' : 'bg-white/90 text-surface-500 ring-1 ring-black/[0.06] group-hover:text-surface-800'}`}
+          >
             <Icon className="h-[18px] w-[18px]" />
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex items-start gap-2">
-              <span className="min-w-0 flex-1 truncate text-[13px] font-black leading-5 text-surface-900">{trimTitle(item.title)}</span>
-              <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full shadow-[0_0_0_3px_rgba(255,255,255,0.9)] ${toolColors[item.tool] || 'bg-surface-400'}`} />
+              <span className="min-w-0 flex-1 truncate text-[13px] font-black leading-5 text-surface-900">
+                {trimTitle(item.title)}
+              </span>
+              <span
+                className={`mt-1.5 h-2 w-2 shrink-0 rounded-full shadow-[0_0_0_3px_rgba(255,255,255,0.9)] ${toolColors[item.tool] || 'bg-surface-400'}`}
+              />
             </div>
             <div className="mt-1.5 flex items-center gap-2 text-[11px] font-medium text-surface-400">
               <span>{formatTime(item.updated_at) || '刚刚'}</span>
               <span className="h-1 w-1 rounded-full bg-surface-300" />
               <span>{item.message_count || 0} 条</span>
-              <span className="ml-auto rounded-full bg-surface-100/90 px-2 py-0.5 text-[10px] font-black leading-none text-surface-500 ring-1 ring-black/[0.03]">{toolLabel[item.tool]}</span>
+              <span className="ml-auto rounded-full bg-surface-100/90 px-2 py-0.5 text-[10px] font-black leading-none text-surface-500 ring-1 ring-black/[0.03]">
+                {toolLabel[item.tool]}
+              </span>
             </div>
           </div>
         </button>
 
         {item.id !== 'current' && hovered === item.id && (
-          <div className="absolute right-2 top-2 flex items-center gap-1 rounded-full bg-[#f7f2e8]/95 p-0.5 shadow-sm ring-1 ring-black/[0.06]" onClick={(e) => e.stopPropagation()}>
+          <div
+            className="absolute right-2 top-2 flex items-center gap-1 rounded-full bg-[#f7f2e8]/95 p-0.5 shadow-sm ring-1 ring-black/[0.06]"
+            onClick={(e) => e.stopPropagation()}
+          >
             {onRenameConversation && (
-              <button type="button" onClick={() => handleRenameConversation(item)} className="rounded-full p-1.5 text-surface-400 hover:bg-white hover:text-surface-800" title="修改标题">
+              <button
+                type="button"
+                onClick={() => handleRenameConversation(item)}
+                className="rounded-full p-1.5 text-surface-400 hover:bg-white hover:text-surface-800"
+                title="修改标题"
+              >
                 <Edit3 className="h-3 w-3" />
               </button>
             )}
             {onDeleteConversation && (
-              <button type="button" onClick={() => onDeleteConversation(item.id)} className="rounded-full p-1.5 text-red-400 hover:bg-red-50 hover:text-red-600" title="删除对话">
+              <button
+                type="button"
+                onClick={() => onDeleteConversation(item.id)}
+                className="rounded-full p-1.5 text-red-400 hover:bg-red-50 hover:text-red-600"
+                title="删除对话"
+              >
                 <Trash2 className="h-3 w-3" />
               </button>
             )}
@@ -338,11 +478,19 @@ export function ConversationSidebar({
       <div className="border-b border-black/[0.04] bg-[#fbf8f1]/68 px-5 pb-5 pt-6 shadow-[0_1px_0_rgba(255,255,255,0.75)_inset]">
         <div className="mb-5 flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-2xl bg-white text-surface-900 shadow-sm ring-1 ring-black/[0.06]">
-            <img src={LOGO_URL} alt="revueOffice logo" className="h-full w-full object-cover" />
+            <img
+              src={LOGO_URL}
+              alt="revueOffice logo"
+              className="h-full w-full object-cover"
+            />
           </div>
           <div className="min-w-0 flex-1">
-            <div className="truncate text-base font-black tracking-tight text-surface-950">revueOffice</div>
-            <div className="mt-0.5 truncate text-[11px] font-semibold text-surface-400">办公创作空间</div>
+            <div className="truncate text-base font-black tracking-tight text-surface-950">
+              revueOffice
+            </div>
+            <div className="mt-0.5 truncate text-[11px] font-semibold text-surface-400">
+              办公创作空间
+            </div>
           </div>
         </div>
 
@@ -370,8 +518,12 @@ export function ConversationSidebar({
 
       <div className="flex-1 overflow-y-auto px-3 py-3">
         <div className="mb-3 flex items-center justify-between px-1">
-          <span className="text-[10px] font-black uppercase tracking-[0.18em] text-surface-400">项目空间</span>
-          <span className="rounded-full bg-white/75 px-2 py-0.5 text-[10px] font-bold text-surface-500">{filteredProjects.length}</span>
+          <span className="text-[10px] font-black uppercase tracking-[0.18em] text-surface-400">
+            项目空间
+          </span>
+          <span className="rounded-full bg-white/75 px-2 py-0.5 text-[10px] font-bold text-surface-500">
+            {filteredProjects.length}
+          </span>
         </div>
 
         <div className="space-y-2">
@@ -394,18 +546,24 @@ export function ConversationSidebar({
                     className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-surface-500 hover:bg-white"
                     title={isExpanded ? '收起项目' : '展开项目'}
                   >
-                    <ChevronDown className={`h-4 w-4 transition-transform ${isExpanded ? '' : '-rotate-90'}`} />
+                    <ChevronDown
+                      className={`h-4 w-4 transition-transform ${isExpanded ? '' : '-rotate-90'}`}
+                    />
                   </button>
                   <button
                     type="button"
                     onClick={() => onSelectProject?.(proj.id)}
                     className="flex min-w-0 flex-1 items-center gap-2 rounded-xl px-1.5 py-1.5 text-left hover:bg-white/65"
                   >
-                    <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${isActive ? 'bg-surface-950 text-white' : 'bg-white/85 text-surface-500 ring-1 ring-black/[0.04]'}`}>
+                    <div
+                      className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${isActive ? 'bg-surface-950 text-white' : 'bg-white/85 text-surface-500 ring-1 ring-black/[0.04]'}`}
+                    >
                       <Folder className="h-4 w-4" />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <div className="truncate text-[13px] font-black leading-4 text-surface-900">{proj.title}</div>
+                      <div className="truncate text-[13px] font-black leading-4 text-surface-900">
+                        {proj.title}
+                      </div>
                       <div className="mt-0.5 flex items-center gap-1.5 text-[10px] text-surface-400">
                         <ToolIcon className="h-3 w-3" />
                         <span>{toolLabel[proj.tool_kind || 'general']}</span>
@@ -417,7 +575,15 @@ export function ConversationSidebar({
                   {onDeleteProject && (
                     <button
                       type="button"
-                      onClick={(e) => { e.stopPropagation(); if (confirm(`删除项目「${proj.title}」？项目下的对话不会删除。`)) onDeleteProject(proj.id) }}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        if (
+                          confirm(
+                            `删除项目「${proj.title}」？项目下的对话不会删除。`,
+                          )
+                        )
+                          onDeleteProject(proj.id)
+                      }}
                       className="mr-1 rounded-xl p-2 text-surface-300 opacity-0 transition-all hover:bg-red-50 hover:text-red-500 group-hover:opacity-100"
                       title="删除项目"
                     >
@@ -429,7 +595,11 @@ export function ConversationSidebar({
                 {isExpanded && (
                   <div className="border-t border-black/[0.04] bg-black/[0.015] px-3 pb-2 pt-1.5">
                     {convs.length > 0 ? (
-                      <div className="ml-8 space-y-0.5">{convs.map((item) => renderConversationItem(item, true))}</div>
+                      <div className="ml-8 space-y-0.5">
+                        {convs.map((item) =>
+                          renderConversationItem(item, true),
+                        )}
+                      </div>
                     ) : (
                       <div className="ml-8 rounded-xl border border-dashed border-black/[0.08] bg-white/35 px-3 py-3 text-center text-[11px] font-medium text-surface-400">
                         暂无对话
@@ -449,10 +619,14 @@ export function ConversationSidebar({
             onClick={() => setShowUnassigned(!showUnassigned)}
             className="mb-2 flex w-full items-center justify-between px-1"
           >
-            <span className="text-[10px] font-black uppercase tracking-[0.18em] text-surface-400">独立对话</span>
+            <span className="text-[10px] font-black uppercase tracking-[0.18em] text-surface-400">
+              独立对话
+            </span>
             <span className="flex items-center gap-1.5 rounded-full bg-white/[0.58] px-2 py-0.5 text-[10px] font-bold text-surface-500 shadow-sm">
               {unassignedConversations.length}
-              <ChevronDown className={`h-3.5 w-3.5 transition-transform ${showUnassigned ? '' : '-rotate-90'}`} />
+              <ChevronDown
+                className={`h-3.5 w-3.5 transition-transform ${showUnassigned ? '' : '-rotate-90'}`}
+              />
             </span>
           </button>
           {(showUnassigned || draggingId) && (
@@ -463,7 +637,9 @@ export function ConversationSidebar({
             >
               {unassignedConversations.length > 0 ? (
                 <>
-                  {unassignedConversations.slice(0, unassignedLimit).map((item) => renderConversationItem(item))}
+                  {unassignedConversations
+                    .slice(0, unassignedLimit)
+                    .map((item) => renderConversationItem(item))}
                   {unassignedConversations.length > unassignedLimit && (
                     <button
                       type="button"
@@ -471,7 +647,8 @@ export function ConversationSidebar({
                       className="flex w-full items-center justify-center gap-1.5 rounded-2xl px-2.5 py-2 text-[11px] font-bold text-surface-500 hover:bg-white/70 hover:text-surface-800"
                     >
                       <MoreHorizontal className="h-3.5 w-3.5" />
-                      查看更多（{unassignedConversations.length - unassignedLimit} 条）
+                      查看更多（
+                      {unassignedConversations.length - unassignedLimit} 条）
                     </button>
                   )}
                 </>
@@ -484,9 +661,11 @@ export function ConversationSidebar({
           )}
         </section>
 
-        {(currentConversations.length === 0 && filteredProjects.length === 0) && (
+        {currentConversations.length === 0 && filteredProjects.length === 0 && (
           <div className="rounded-[1.5rem] border border-dashed border-black/10 bg-white/58 px-4 py-8 text-center text-xs font-medium leading-relaxed text-surface-500">
-            {searchQuery.trim() ? '没有匹配的项目或对话。试试换个关键词。' : '暂无项目和对话。可在输入框项目下拉中新建项目。'}
+            {searchQuery.trim()
+              ? '没有匹配的项目或对话。试试换个关键词。'
+              : '暂无项目和对话。可在输入框项目下拉中新建项目。'}
           </div>
         )}
       </div>
@@ -516,10 +695,10 @@ export function ConversationSidebar({
                 type="button"
                 onClick={() => navigate(item.to)}
                 className={`flex min-w-0 flex-col items-center gap-1 rounded-xl px-2 py-2 text-[10px] font-bold transition-all ${
-                    item.active
-                      ? 'bg-surface-950 text-white shadow-sm'
-                      : 'text-surface-500 hover:bg-white/80 hover:text-surface-950'
-                  }`}
+                  item.active
+                    ? 'bg-surface-950 text-white shadow-sm'
+                    : 'text-surface-500 hover:bg-white/80 hover:text-surface-950'
+                }`}
                 title={item.label}
               >
                 <Icon className="h-4 w-4" />
@@ -545,8 +724,12 @@ export function ConversationSidebar({
             {userName?.[0]?.toUpperCase() || 'U'}
           </div>
           <div className="min-w-0 flex-1">
-            <div className="truncate text-xs font-bold text-surface-900">{userName || 'User'}</div>
-            <div className="truncate text-[10px] font-medium text-surface-500">个人办公空间</div>
+            <div className="truncate text-xs font-bold text-surface-900">
+              {userName || 'User'}
+            </div>
+            <div className="truncate text-[10px] font-medium text-surface-500">
+              个人办公空间
+            </div>
           </div>
           <button
             type="button"

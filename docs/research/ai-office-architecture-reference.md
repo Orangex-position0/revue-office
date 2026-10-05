@@ -104,13 +104,13 @@ src-tauri/src/
 - 具备 PPT、Word、Excel 或 PDF 等真实文件工作流。
 - 具备可参考的 Agent、工具调用、预览或桌面架构。
 
-| 排名 | 项目 | Stars 快照 | 主要定位 | 与 revue-office 的参考价值 |
-|---:|---|---:|---|---|
-| 1 | [iOfficeAI/AionUi](https://github.com/iOfficeAI/AionUi) | 33,127 | 多模型、多 Agent 的桌面 Cowork 工作区，包含 PPT、Word、Excel 助手 | Agent 平台、Assistant/Skill、桌面与 Web 入口 |
-| 2 | [iOfficeAI/OfficeCLI](https://github.com/iOfficeAI/OfficeCLI) | 31,237 | 面向 Agent 的 Word、Excel、PowerPoint 文件操作和渲染引擎 | 文档能力下沉、CLI/API、结构化操作、渲染反馈 |
-| 3 | [presenton/presenton](https://github.com/presenton/presenton) | 10,769 | 本地/自托管 AI 演示文稿生成、编辑、导出和 API | 生成流水线、模板、导出、桌面和服务端边界 |
-| 4 | [genspark-ai/genoffice](https://github.com/genspark-ai/genoffice) | 7,725 | 原生 AI Office，覆盖 Docs、Sheets、Slides、PDF、Markdown、HTML | 多应用 monorepo、共享引擎、按文档类型拆分 |
-| 5 | [sleipner42/Deckium](https://github.com/sleipner42/Deckium) | 4 | 本地优先、可人工干预的 AI 演示文稿编辑器 | 工具化 Agent Loop、领域状态、校验和可逆编辑 |
+| 排名 | 项目                                                              | Stars 快照 | 主要定位                                                          | 与 revue-office 的参考价值                   |
+| ---: | ----------------------------------------------------------------- | ---------: | ----------------------------------------------------------------- | -------------------------------------------- |
+|    1 | [iOfficeAI/AionUi](https://github.com/iOfficeAI/AionUi)           |     33,127 | 多模型、多 Agent 的桌面 Cowork 工作区，包含 PPT、Word、Excel 助手 | Agent 平台、Assistant/Skill、桌面与 Web 入口 |
+|    2 | [iOfficeAI/OfficeCLI](https://github.com/iOfficeAI/OfficeCLI)     |     31,237 | 面向 Agent 的 Word、Excel、PowerPoint 文件操作和渲染引擎          | 文档能力下沉、CLI/API、结构化操作、渲染反馈  |
+|    3 | [presenton/presenton](https://github.com/presenton/presenton)     |     10,769 | 本地/自托管 AI 演示文稿生成、编辑、导出和 API                     | 生成流水线、模板、导出、桌面和服务端边界     |
+|    4 | [genspark-ai/genoffice](https://github.com/genspark-ai/genoffice) |      7,725 | 原生 AI Office，覆盖 Docs、Sheets、Slides、PDF、Markdown、HTML    | 多应用 monorepo、共享引擎、按文档类型拆分    |
+|    5 | [sleipner42/Deckium](https://github.com/sleipner42/Deckium)       |          4 | 本地优先、可人工干预的 AI 演示文稿编辑器                          | 工具化 Agent Loop、领域状态、校验和可逆编辑  |
 
 > 说明：Star 数来自调研时的 GitHub API 快照，排序只用于筛选参考对象，不代表项目质量或架构优劣。
 
@@ -468,14 +468,14 @@ Deckium 明确区分：
 
 ## 9. 五个项目的横向比较
 
-| 维度 | AionUi | OfficeCLI | Presenton | GenOffice | Deckium |
-|---|---|---|---|---|---|
-| 核心定位 | Agent 工作平台 | Office 文件引擎 | PPT 生成平台 | 多文档 AI Office | PPT Agent 编辑器 |
-| 主要边界 | Assistant/Skill/Agent/渠道 | 文档域/CLI/渲染 | API/生成/模板/导出/桌面 | apps/packages | main/renderer/common |
-| 文档模型 | 依赖底层能力和助手 | 结构化文档对象 | Presentation/Template | 各文档引擎 | Presentation domain |
-| Agent 形态 | 内置 + 外部 Agent | 被 Agent 调用的工具 | 生成任务与 API | 内嵌 AI 面板 | Tool-based loop |
-| 反馈机制 | 工具和产物 | view/HTML/PNG/watch | 编辑预览和导出 | Diff/快照/回滚/引用 | grid/lint/screenshot |
-| 适合借鉴 | 平台化 | 能力下沉 | 流程拆分 | 目标 monorepo | Agent 编辑闭环 |
+| 维度       | AionUi                     | OfficeCLI           | Presenton               | GenOffice           | Deckium              |
+| ---------- | -------------------------- | ------------------- | ----------------------- | ------------------- | -------------------- |
+| 核心定位   | Agent 工作平台             | Office 文件引擎     | PPT 生成平台            | 多文档 AI Office    | PPT Agent 编辑器     |
+| 主要边界   | Assistant/Skill/Agent/渠道 | 文档域/CLI/渲染     | API/生成/模板/导出/桌面 | apps/packages       | main/renderer/common |
+| 文档模型   | 依赖底层能力和助手         | 结构化文档对象      | Presentation/Template   | 各文档引擎          | Presentation domain  |
+| Agent 形态 | 内置 + 外部 Agent          | 被 Agent 调用的工具 | 生成任务与 API          | 内嵌 AI 面板        | Tool-based loop      |
+| 反馈机制   | 工具和产物                 | view/HTML/PNG/watch | 编辑预览和导出          | Diff/快照/回滚/引用 | grid/lint/screenshot |
+| 适合借鉴   | 平台化                     | 能力下沉            | 流程拆分                | 目标 monorepo       | Agent 编辑闭环       |
 
 ## 10. 对 revue-office 的推荐目标架构
 

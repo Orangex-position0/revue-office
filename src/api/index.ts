@@ -1,32 +1,40 @@
-import axios from 'axios';
-import { useAuthStore } from '@/stores/auth-store';
-import type { TokenResponse, ToolKind, Artifact, PersistedSession, AppSettings, MCPServiceConfig, ChatAttachment } from '@/types';
+import axios from 'axios'
+import { useAuthStore } from '@/stores/auth-store'
+import type {
+  TokenResponse,
+  ToolKind,
+  Artifact,
+  PersistedSession,
+  AppSettings,
+  MCPServiceConfig,
+  ChatAttachment,
+} from '@/types'
 
-const API_BASE = '/api';
+const API_BASE = '/api'
 
 const api = axios.create({
   baseURL: API_BASE,
-});
+})
 
 // 请求拦截器：自动添加 token
 api.interceptors.request.use((config) => {
-  const token = useAuthStore.getState().token;
+  const token = useAuthStore.getState().token
   if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
+    config.headers.Authorization = `Bearer ${token}`
   }
-  return config;
-});
+  return config
+})
 
 // 响应拦截器：处理认证错误
 api.interceptors.response.use(
   (res) => res,
   (err) => {
     if (err.response?.status === 401) {
-      useAuthStore.getState().logout();
+      useAuthStore.getState().logout()
     }
-    return Promise.reject(err);
-  }
-);
+    return Promise.reject(err)
+  },
+)
 
 // ===== 认证 API =====
 export const authApi = {
@@ -38,8 +46,11 @@ export const authApi = {
     api.post<TokenResponse>('/auth/register', { username, email, password }),
   getMe: () => api.get('/auth/me'),
   changePassword: (oldPassword: string, newPassword: string) =>
-    api.post('/auth/change-password', { old_password: oldPassword, new_password: newPassword }),
-};
+    api.post('/auth/change-password', {
+      old_password: oldPassword,
+      new_password: newPassword,
+    }),
+}
 
 // ===== PPT API =====
 export const pptApi = {
@@ -51,101 +62,135 @@ export const pptApi = {
     api.patch(`/ppt/project/${id}`, updates),
   deleteProject: (id: string) => api.post(`/ppt/project/${id}/delete`),
   getSlides: (id: string) => api.get(`/ppt/project/${id}/slides`),
-  exportPptx: (id: string) => api.post(`/ppt/project/${id}/export`, {}, { responseType: 'blob' }),
-};
+  exportPptx: (id: string) =>
+    api.post(`/ppt/project/${id}/export`, {}, { responseType: 'blob' }),
+}
 
 // ===== 会话 API =====
 export const sessionApi = {
   listSessions: (params?: { q?: string; page?: number; page_size?: number }) =>
     api.get('/chat/sessions', { params }),
   getSession: (id: string) => api.get<PersistedSession>(`/chat/session/${id}`),
-  updateSession: (id: string, updates: { title?: string; project_id?: string | null; order_col?: number }) => api.patch(`/chat/session/${id}`, updates),
+  updateSession: (
+    id: string,
+    updates: { title?: string; project_id?: string | null; order_col?: number },
+  ) => api.patch(`/chat/session/${id}`, updates),
   deleteSession: (id: string) => api.delete(`/chat/session/${id}`),
-};
+}
 
 // ===== Excel API =====
 export const excelApi = {
-  exportXlsx: (artifact: Artifact) => api.post('/excel/export', {
-    title: artifact.title,
-    tables: artifact.content?.tables || [],
-  }, { responseType: 'blob' }),
-};
+  exportXlsx: (artifact: Artifact) =>
+    api.post(
+      '/excel/export',
+      {
+        title: artifact.title,
+        tables: artifact.content?.tables || [],
+      },
+      { responseType: 'blob' },
+    ),
+}
 
 // ===== Word 文档 API =====
 export const docApi = {
-  exportDocx: (artifact: Artifact) => api.post('/doc/export', {
-    title: artifact.content?.title || artifact.title,
-    sections: artifact.content?.sections || [],
-  }, { responseType: 'blob' }),
-};
+  exportDocx: (artifact: Artifact) =>
+    api.post(
+      '/doc/export',
+      {
+        title: artifact.content?.title || artifact.title,
+        sections: artifact.content?.sections || [],
+      },
+      { responseType: 'blob' },
+    ),
+}
 
 // ===== 项目 API =====
 export const projectApi = {
-  listProjects: (params?: { q?: string }) =>
-    api.get('/projects', { params }),
+  listProjects: (params?: { q?: string }) => api.get('/projects', { params }),
   getProject: (id: string) => api.get(`/projects/${id}`),
   createProject: (title: string, tool_kind?: string, description?: string) =>
     api.post('/projects', { title, tool_kind, description }),
-  updateProject: (id: string, updates: { title?: string; description?: string; tool_kind?: string }) =>
-    api.patch(`/projects/${id}`, updates),
+  updateProject: (
+    id: string,
+    updates: { title?: string; description?: string; tool_kind?: string },
+  ) => api.patch(`/projects/${id}`, updates),
   deleteProject: (id: string) => api.delete(`/projects/${id}`),
   getProjectSessions: (id: string) => api.get(`/projects/${id}/sessions`),
-};
+}
 
 // ===== 设置 API =====
 export const settingsApi = {
   getSettings: () => api.get<AppSettings>('/settings'),
-  saveSettings: (payload: AppSettings) => api.put<AppSettings>('/settings', payload),
-  testMcp: (payload: MCPServiceConfig) => api.post('/settings/mcp/test', payload),
-};
+  saveSettings: (payload: AppSettings) =>
+    api.put<AppSettings>('/settings', payload),
+  testMcp: (payload: MCPServiceConfig) =>
+    api.post('/settings/mcp/test', payload),
+}
 
 // ===== 文件 API =====
 export const fileApi = {
-  list: (folderId?: string) => api.get('/files', { params: { folder_id: folderId } }),
+  list: (folderId?: string) =>
+    api.get('/files', { params: { folder_id: folderId } }),
   search: (q: string) => api.get('/files/search', { params: { q } }),
   stats: () => api.get('/files/stats'),
   upload: (file: File, folderId?: string, description?: string) => {
-    const formData = new FormData();
-    formData.append('file', file);
-    const headers: Record<string, string> = {};
-    headers['x-filename'] = file.name;
-    if (folderId) headers['x-folder-id'] = folderId;
-    if (description) headers['x-description'] = description;
-    return api.post('/files/upload', formData, { headers });
+    const formData = new FormData()
+    formData.append('file', file)
+    const headers: Record<string, string> = {}
+    headers['x-filename'] = file.name
+    if (folderId) headers['x-folder-id'] = folderId
+    if (description) headers['x-description'] = description
+    return api.post('/files/upload', formData, { headers })
   },
-  saveBlob: (blob: Blob, filename: string, description?: string, folderId?: string) => {
-    const file = new File([blob], filename, { type: blob.type || 'application/octet-stream' });
-    return fileApi.upload(file, folderId, description);
+  saveBlob: (
+    blob: Blob,
+    filename: string,
+    description?: string,
+    folderId?: string,
+  ) => {
+    const file = new File([blob], filename, {
+      type: blob.type || 'application/octet-stream',
+    })
+    return fileApi.upload(file, folderId, description)
   },
   extract: (file: File) => {
-    const formData = new FormData();
-    formData.append('file', file);
-    return api.post('/files/extract', formData, { headers: { 'x-filename': file.name } });
+    const formData = new FormData()
+    formData.append('file', file)
+    return api.post('/files/extract', formData, {
+      headers: { 'x-filename': file.name },
+    })
   },
   get: (id: string) => api.get(`/files/${id}`),
   content: (id: string) => api.get(`/files/${id}/content`),
-  thumbnail: (id: string) => api.get(`/files/${id}/thumbnail`, { responseType: 'blob' }),
+  thumbnail: (id: string) =>
+    api.get(`/files/${id}/thumbnail`, { responseType: 'blob' }),
   preview: (id: string) => api.get(`/files/${id}/preview`),
-  download: (id: string) => api.get(`/files/${id}/download`, { responseType: 'blob' }),
+  download: (id: string) =>
+    api.get(`/files/${id}/download`, { responseType: 'blob' }),
   delete: (id: string) => api.delete(`/files/${id}`),
-};
+}
 
 // ===== 文件夹 API =====
 export const folderApi = {
-  list: (parentId?: string) => api.get('/files/folders/list', { params: { parent_id: parentId } }),
-  create: (name: string, parentId?: string) => api.post('/folders', { name, parent_id: parentId }),
+  list: (parentId?: string) =>
+    api.get('/files/folders/list', { params: { parent_id: parentId } }),
+  create: (name: string, parentId?: string) =>
+    api.post('/folders', { name, parent_id: parentId }),
   delete: (id: string) => api.delete(`/folders/${id}`),
-};
+}
 
 // ===== 通知 API =====
 export const notificationApi = {
-  list: (params?: { unread_only?: boolean; page?: number; page_size?: number }) =>
-    api.get('/notifications', { params }),
+  list: (params?: {
+    unread_only?: boolean
+    page?: number
+    page_size?: number
+  }) => api.get('/notifications', { params }),
   unreadCount: () => api.get('/notifications/unread'),
   markAsRead: (id: string) => api.post(`/notifications/${id}/read`),
   markAllAsRead: () => api.post('/notifications/read-all'),
   delete: (id: string) => api.delete(`/notifications/${id}`),
-};
+}
 
 // ===== 对话 API (SSE) =====
 export const chatApi = {
@@ -160,7 +205,7 @@ export const chatApi = {
     onEvent: (event: string, data: any) => void,
     token: string,
     signal?: AbortSignal,
-    toolConfig?: Record<string, any>
+    toolConfig?: Record<string, any>,
   ) => {
     const response = await fetch(`${API_BASE}/chat/stream`, {
       method: 'POST',
@@ -179,62 +224,62 @@ export const chatApi = {
         tool_config: toolConfig,
       }),
       signal,
-    });
+    })
 
     if (!response.ok) {
-      let detail = `HTTP ${response.status}`;
+      let detail = `HTTP ${response.status}`
       try {
-        const err = await response.json();
-        detail = err.detail || err.message || detail;
+        const err = await response.json()
+        detail = err.detail || err.message || detail
       } catch {
         try {
-          detail = await response.text();
+          detail = await response.text()
         } catch {
-          detail = `HTTP ${response.status}`;
+          detail = `HTTP ${response.status}`
         }
       }
       if (response.status === 401) {
-        useAuthStore.getState().logout();
+        useAuthStore.getState().logout()
       }
-      throw new Error(detail);
+      throw new Error(detail)
     }
 
-    const reader = response.body?.getReader();
-    const decoder = new TextDecoder();
+    const reader = response.body?.getReader()
+    const decoder = new TextDecoder()
 
-    if (!reader) return;
+    if (!reader) return
 
-    let buffer = '';
-    let currentEvent = 'message';
+    let buffer = ''
+    let currentEvent = 'message'
     try {
       while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
+        const { done, value } = await reader.read()
+        if (done) break
 
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || '';
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n')
+        buffer = lines.pop() || ''
 
         for (const line of lines) {
           if (line.startsWith('event:')) {
-            currentEvent = line.slice(6).trim();
+            currentEvent = line.slice(6).trim()
           } else if (line.startsWith('data:')) {
-            const dataStr = line.slice(5).trim();
+            const dataStr = line.slice(5).trim()
             if (dataStr) {
               try {
-                const data = JSON.parse(dataStr);
-                onEvent(currentEvent, data);
+                const data = JSON.parse(dataStr)
+                onEvent(currentEvent, data)
               } catch {
-                onEvent(currentEvent, dataStr);
+                onEvent(currentEvent, dataStr)
               }
             }
           } else if (line.trim() === '') {
-            currentEvent = 'message';
+            currentEvent = 'message'
           }
         }
       }
     } finally {
-      reader.releaseLock();
+      reader.releaseLock()
     }
   },
-};
+}

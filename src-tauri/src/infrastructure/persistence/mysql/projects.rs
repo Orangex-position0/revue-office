@@ -62,7 +62,9 @@ impl ProjectRepository for MySqlProjectRepository {
 
     async fn find(&self, owner: &ActorId, id: &ProjectId) -> Result<Option<Project>, ProjectError> {
         let sql = format!("SELECT {COLUMNS} FROM projects WHERE id = ? AND owner_id = ?");
-        let row = sqlx::query(&sql)
+        let mut sql = sqlx::QueryBuilder::<sqlx::MySql>::new(sql);
+        let row = sql
+            .build()
             .bind(&id.0)
             .bind(&owner.0)
             .fetch_optional(&self.pool)
@@ -78,10 +80,12 @@ impl ProjectRepository for MySqlProjectRepository {
             .filter(|item| item != "%%");
         let rows = if let Some(query) = query {
             let sql = format!("SELECT {COLUMNS} FROM projects WHERE owner_id = ? AND (title LIKE ? OR COALESCE(description, '') LIKE ?) ORDER BY updated_at DESC");
-            sqlx::query(&sql).bind(&value.owner_id.0).bind(&query).bind(&query).fetch_all(&self.pool).await
+            let mut sql = sqlx::QueryBuilder::<sqlx::MySql>::new(sql);
+            sql.build().bind(&value.owner_id.0).bind(&query).bind(&query).fetch_all(&self.pool).await
         } else {
             let sql = format!("SELECT {COLUMNS} FROM projects WHERE owner_id = ? ORDER BY updated_at DESC");
-            sqlx::query(&sql).bind(&value.owner_id.0).fetch_all(&self.pool).await
+            let mut sql = sqlx::QueryBuilder::<sqlx::MySql>::new(sql);
+            sql.build().bind(&value.owner_id.0).fetch_all(&self.pool).await
         }.map_err(Self::error)?;
         rows.iter().map(Self::project).collect()
     }

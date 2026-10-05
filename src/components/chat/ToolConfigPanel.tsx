@@ -8,7 +8,11 @@ interface ToolConfigPanelProps {
   onConfigChange: (config: ToolConfigMap) => void
 }
 
-export default function ToolConfigPanel({ activeTool, config, onConfigChange }: ToolConfigPanelProps) {
+export default function ToolConfigPanel({
+  activeTool,
+  config,
+  onConfigChange,
+}: ToolConfigPanelProps) {
   const [open, setOpen] = useState(false)
   const panelRef = useRef<HTMLDivElement>(null)
 
@@ -39,7 +43,7 @@ export default function ToolConfigPanel({ activeTool, config, onConfigChange }: 
     if (Object.keys(defaults).length > 0) {
       onConfigChange({ ...config, ...defaults })
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTool])
 
   if (!options || options.length === 0) return null
@@ -51,11 +55,11 @@ export default function ToolConfigPanel({ activeTool, config, onConfigChange }: 
   const getActiveLabel = (opt: ToolConfigOption): string => {
     const val = config[opt.key] ?? opt.defaultValue
     if (opt.type === 'toggle') return val ? '开' : '关'
-    const match = opt.options?.find(o => o.value === val)
+    const match = opt.options?.find((o) => o.value === val)
     return match?.label ?? String(val)
   }
 
-  const hasNonDefault = options.some(opt => {
+  const hasNonDefault = options.some((opt) => {
     const val = config[opt.key] ?? opt.defaultValue
     return val !== opt.defaultValue
   })
@@ -66,18 +70,34 @@ export default function ToolConfigPanel({ activeTool, config, onConfigChange }: 
         onClick={() => setOpen(!open)}
         className={`
           flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium transition-colors
-          ${open
-            ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300'
-            : hasNonDefault
-              ? 'bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'
-              : 'bg-gray-100 text-gray-500 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700'
+          ${
+            open
+              ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300'
+              : hasNonDefault
+                ? 'bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'
+                : 'bg-gray-100 text-gray-500 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700'
           }
         `}
         title="调整生成配置"
       >
-        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+        <svg
+          className="w-3.5 h-3.5"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+          />
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+          />
         </svg>
         <span>配置</span>
         {hasNonDefault && (
@@ -98,8 +118,18 @@ export default function ToolConfigPanel({ activeTool, config, onConfigChange }: 
               onClick={() => setOpen(false)}
               className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M6 18L18 6M6 6l12 12"
+                />
               </svg>
             </button>
           </div>
@@ -123,14 +153,17 @@ export default function ToolConfigPanel({ activeTool, config, onConfigChange }: 
                           onClick={() => handleChange(opt.key, option.value)}
                           className={`
                             flex items-center justify-between px-3 py-2 rounded-lg text-left transition-all text-xs
-                            ${isActive
-                              ? 'bg-indigo-50 text-indigo-700 ring-1 ring-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-300 dark:ring-indigo-800'
-                              : 'bg-gray-50 text-gray-600 hover:bg-gray-100 dark:bg-gray-700/50 dark:text-gray-300 dark:hover:bg-gray-700'
+                            ${
+                              isActive
+                                ? 'bg-indigo-50 text-indigo-700 ring-1 ring-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-300 dark:ring-indigo-800'
+                                : 'bg-gray-50 text-gray-600 hover:bg-gray-100 dark:bg-gray-700/50 dark:text-gray-300 dark:hover:bg-gray-700'
                             }
                           `}
                         >
                           <div className="flex items-center gap-2">
-                            <span className={`w-2 h-2 rounded-full ${isActive ? 'bg-indigo-500' : 'bg-gray-300 dark:bg-gray-500'}`} />
+                            <span
+                              className={`w-2 h-2 rounded-full ${isActive ? 'bg-indigo-500' : 'bg-gray-300 dark:bg-gray-500'}`}
+                            />
                             <span className="font-medium">{option.label}</span>
                           </div>
                           {option.description && (
@@ -146,12 +179,18 @@ export default function ToolConfigPanel({ activeTool, config, onConfigChange }: 
 
                 {opt.type === 'toggle' && (
                   <button
-                    onClick={() => handleChange(opt.key, !(config[opt.key] ?? opt.defaultValue))}
+                    onClick={() =>
+                      handleChange(
+                        opt.key,
+                        !(config[opt.key] ?? opt.defaultValue),
+                      )
+                    }
                     className={`
                       relative inline-flex h-5 w-9 items-center rounded-full transition-colors
-                      ${(config[opt.key] ?? opt.defaultValue)
-                        ? 'bg-indigo-500'
-                        : 'bg-gray-300 dark:bg-gray-600'
+                      ${
+                        (config[opt.key] ?? opt.defaultValue)
+                          ? 'bg-indigo-500'
+                          : 'bg-gray-300 dark:bg-gray-600'
                       }
                     `}
                   >
@@ -176,7 +215,9 @@ export default function ToolConfigPanel({ activeTool, config, onConfigChange }: 
                   className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400"
                 >
                   <span className="font-medium">{opt.label}</span>
-                  <span className="text-gray-700 dark:text-gray-300">{getActiveLabel(opt)}</span>
+                  <span className="text-gray-700 dark:text-gray-300">
+                    {getActiveLabel(opt)}
+                  </span>
                 </span>
               ))}
             </div>

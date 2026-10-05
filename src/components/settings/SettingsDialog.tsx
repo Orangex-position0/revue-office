@@ -1,7 +1,12 @@
 import { Check, KeyRound, Palette, Plus, Plug, Trash2, X } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { settingsApi } from '@/api'
-import type { AppSettings, DisplayTheme, LLMProfile, MCPServiceConfig } from '@/types'
+import type {
+  AppSettings,
+  DisplayTheme,
+  LLMProfile,
+  MCPServiceConfig,
+} from '@/types'
 
 interface SettingsDialogProps {
   open: boolean
@@ -42,14 +47,26 @@ const emptyMcpServer = (): MCPServiceConfig => ({
   description: '',
 })
 
-export function SettingsDialog({ open, settings, onClose, onSave, displayTheme, onDisplayThemeChange }: SettingsDialogProps) {
+export function SettingsDialog({
+  open,
+  settings,
+  onClose,
+  onSave,
+  displayTheme,
+  onDisplayThemeChange,
+}: SettingsDialogProps) {
   const [section, setSection] = useState<'llm' | 'base' | 'mcp'>('llm')
   const [draft, setDraft] = useState<AppSettings | null>(settings)
-  const [displayThemeDraft, setDisplayThemeDraft] = useState<DisplayTheme>(displayTheme)
-  const [profileKeyDrafts, setProfileKeyDrafts] = useState<Record<string, string>>({})
+  const [displayThemeDraft, setDisplayThemeDraft] =
+    useState<DisplayTheme>(displayTheme)
+  const [profileKeyDrafts, setProfileKeyDrafts] = useState<
+    Record<string, string>
+  >({})
   const [saving, setSaving] = useState(false)
   const [testingMcpId, setTestingMcpId] = useState<string | null>(null)
-  const [mcpTestResults, setMcpTestResults] = useState<Record<string, { ok: boolean; message: string; tools: string[] }>>({})
+  const [mcpTestResults, setMcpTestResults] = useState<
+    Record<string, { ok: boolean; message: string; tools: string[] }>
+  >({})
 
   useEffect(() => {
     setDraft(settings)
@@ -67,7 +84,9 @@ export function SettingsDialog({ open, settings, onClose, onSave, displayTheme, 
   }, [open, onClose])
 
   const hasChanges = useMemo(
-    () => JSON.stringify(draft) !== JSON.stringify(settings) || displayThemeDraft !== displayTheme,
+    () =>
+      JSON.stringify(draft) !== JSON.stringify(settings) ||
+      displayThemeDraft !== displayTheme,
     [displayTheme, displayThemeDraft, draft, settings],
   )
 
@@ -91,8 +110,12 @@ export function SettingsDialog({ open, settings, onClose, onSave, displayTheme, 
 
   const removeProfile = (id: string) => {
     if (draft.llm_profiles.length <= 1) return
-    const nextProfiles = draft.llm_profiles.filter((profile) => profile.id !== id)
-    const activeProfile = nextProfiles.find((profile) => profile.id === draft.active_profile_id) || nextProfiles[0]
+    const nextProfiles = draft.llm_profiles.filter(
+      (profile) => profile.id !== id,
+    )
+    const activeProfile =
+      nextProfiles.find((profile) => profile.id === draft.active_profile_id) ||
+      nextProfiles[0]
     updateDraft({
       llm_profiles: nextProfiles,
       active_profile_id: activeProfile.id,
@@ -123,13 +146,19 @@ export function SettingsDialog({ open, settings, onClose, onSave, displayTheme, 
 
   const updateMcp = (id: string, patch: Partial<MCPServiceConfig>) => {
     updateDraft({
-      mcp_servers: draft.mcp_servers.map((server) => (server.id === id ? { ...server, ...patch } : server)),
+      mcp_servers: draft.mcp_servers.map((server) =>
+        server.id === id ? { ...server, ...patch } : server,
+      ),
     })
   }
 
-  const addMcp = () => updateDraft({ mcp_servers: [...draft.mcp_servers, emptyMcpServer()] })
+  const addMcp = () =>
+    updateDraft({ mcp_servers: [...draft.mcp_servers, emptyMcpServer()] })
 
-  const removeMcp = (id: string) => updateDraft({ mcp_servers: draft.mcp_servers.filter((server) => server.id !== id) })
+  const removeMcp = (id: string) =>
+    updateDraft({
+      mcp_servers: draft.mcp_servers.filter((server) => server.id !== id),
+    })
 
   const testMcp = async (server: MCPServiceConfig) => {
     setTestingMcpId(server.id)
@@ -174,17 +203,34 @@ export function SettingsDialog({ open, settings, onClose, onSave, displayTheme, 
     }
   }
 
-  const activeProfile = draft.llm_profiles.find((profile) => profile.id === draft.active_profile_id) || draft.llm_profiles[0]
+  const activeProfile =
+    draft.llm_profiles.find(
+      (profile) => profile.id === draft.active_profile_id,
+    ) || draft.llm_profiles[0]
 
   return (
-    <div className="h-full overflow-hidden bg-transparent p-2 sm:p-5" role="dialog" aria-modal="true" aria-labelledby="settings-dialog-title">
+    <div
+      className="h-full overflow-hidden bg-transparent p-2 sm:p-5"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="settings-dialog-title"
+    >
       <div className="mx-auto flex h-full max-w-6xl flex-col overflow-hidden rounded-[1.5rem] border border-black/[0.06] bg-white/72 shadow-[0_24px_80px_rgba(24,24,27,0.10)] backdrop-blur-2xl sm:flex-row sm:rounded-[2rem]">
         <aside className="w-full shrink-0 border-b border-black/[0.06] bg-[#eee9df]/70 p-3 sm:w-56 sm:border-b-0 sm:border-r sm:p-4">
           <div className="mb-5 flex items-center justify-between">
             <div>
-              <div id="settings-dialog-title" className="text-lg font-bold tracking-tight text-surface-950">设置</div>
+              <div
+                id="settings-dialog-title"
+                className="text-lg font-bold tracking-tight text-surface-950"
+              >
+                设置
+              </div>
             </div>
-            <button onClick={onClose} className="rounded-full bg-white/75 p-2 text-surface-500 hover:bg-white hover:text-surface-950" title="关闭">
+            <button
+              onClick={onClose}
+              className="rounded-full bg-white/75 p-2 text-surface-500 hover:bg-white hover:text-surface-950"
+              title="关闭"
+            >
               <X className="h-4 w-4" />
             </button>
           </div>
@@ -214,17 +260,26 @@ export function SettingsDialog({ open, settings, onClose, onSave, displayTheme, 
             <div>
               <div className="mb-5 flex items-start justify-between gap-4">
                 <div>
-                  <h2 className="text-xl font-bold tracking-tight text-surface-950">模型服务</h2>
-                  <p className="mt-1 text-sm text-surface-500">配置多个模型服务，选择默认启用的模型。</p>
+                  <h2 className="text-xl font-bold tracking-tight text-surface-950">
+                    模型服务
+                  </h2>
+                  <p className="mt-1 text-sm text-surface-500">
+                    配置多个模型服务，选择默认启用的模型。
+                  </p>
                 </div>
-                <button onClick={addProfile} className="inline-flex items-center gap-1.5 rounded-full bg-surface-950 px-4 py-2 text-sm font-semibold text-white hover:bg-surface-800">
+                <button
+                  onClick={addProfile}
+                  className="inline-flex items-center gap-1.5 rounded-full bg-surface-950 px-4 py-2 text-sm font-semibold text-white hover:bg-surface-800"
+                >
                   <Plus className="h-4 w-4" />
                   添加配置
                 </button>
               </div>
 
               <div className="mb-5 rounded-[1.5rem] border border-black/[0.06] bg-[#f8f5ee]/80 p-4">
-                <label className="mb-2 block text-xs font-bold uppercase tracking-[0.14em] text-surface-500">当前默认模型</label>
+                <label className="mb-2 block text-xs font-bold uppercase tracking-[0.14em] text-surface-500">
+                  当前默认模型
+                </label>
                 <div className="grid gap-3 md:grid-cols-2">
                   <select
                     value={draft.active_profile_id}
@@ -232,16 +287,25 @@ export function SettingsDialog({ open, settings, onClose, onSave, displayTheme, 
                     className="rounded-2xl border border-black/10 bg-white px-3 py-2.5 text-sm outline-none focus:border-surface-500"
                   >
                     {draft.llm_profiles.map((profile) => (
-                      <option key={profile.id} value={profile.id}>{profile.name}</option>
+                      <option key={profile.id} value={profile.id}>
+                        {profile.name}
+                      </option>
                     ))}
                   </select>
                   <select
                     value={draft.active_model}
-                    onChange={(event) => updateDraft({ active_model: event.target.value, default_model: event.target.value })}
+                    onChange={(event) =>
+                      updateDraft({
+                        active_model: event.target.value,
+                        default_model: event.target.value,
+                      })
+                    }
                     className="rounded-2xl border border-black/10 bg-white px-3 py-2.5 text-sm outline-none focus:border-surface-500"
                   >
                     {(activeProfile?.models || []).map((model) => (
-                      <option key={model} value={model}>{model}</option>
+                      <option key={model} value={model}>
+                        {model}
+                      </option>
                     ))}
                   </select>
                 </div>
@@ -251,12 +315,19 @@ export function SettingsDialog({ open, settings, onClose, onSave, displayTheme, 
                 {draft.llm_profiles.map((profile) => {
                   const isActive = draft.active_profile_id === profile.id
                   return (
-                    <div key={profile.id} className={`rounded-[1.6rem] border p-4 shadow-sm transition-all ${isActive ? 'border-surface-900 bg-white ring-2 ring-surface-950/5' : 'border-black/[0.06] bg-white/75'}`}>
+                    <div
+                      key={profile.id}
+                      className={`rounded-[1.6rem] border p-4 shadow-sm transition-all ${isActive ? 'border-surface-900 bg-white ring-2 ring-surface-950/5' : 'border-black/[0.06] bg-white/75'}`}
+                    >
                       <div className="mb-4 flex items-start justify-between gap-3">
                         <div className="min-w-0 flex-1">
                           <input
                             value={profile.name}
-                            onChange={(event) => updateProfile(profile.id, { name: event.target.value })}
+                            onChange={(event) =>
+                              updateProfile(profile.id, {
+                                name: event.target.value,
+                              })
+                            }
                             className="w-full bg-transparent text-base font-bold text-surface-950 outline-none"
                             placeholder="配置名称"
                           />
@@ -268,10 +339,16 @@ export function SettingsDialog({ open, settings, onClose, onSave, displayTheme, 
                         <div className="flex items-center gap-1.5">
                           {isActive ? (
                             <span className="inline-flex items-center gap-1 rounded-full bg-surface-950 px-2.5 py-1 text-[10px] font-bold text-white">
-                              <Check className="h-3 w-3" />启用中
+                              <Check className="h-3 w-3" />
+                              启用中
                             </span>
                           ) : (
-                            <button onClick={() => setActiveProfile(profile.id)} className="rounded-full border border-black/10 bg-white px-3 py-1 text-xs font-semibold text-surface-600 hover:bg-surface-50">启用</button>
+                            <button
+                              onClick={() => setActiveProfile(profile.id)}
+                              className="rounded-full border border-black/10 bg-white px-3 py-1 text-xs font-semibold text-surface-600 hover:bg-surface-50"
+                            >
+                              启用
+                            </button>
                           )}
                           <button
                             onClick={() => removeProfile(profile.id)}
@@ -289,7 +366,11 @@ export function SettingsDialog({ open, settings, onClose, onSave, displayTheme, 
                           Base URL
                           <input
                             value={profile.base_url}
-                            onChange={(event) => updateProfile(profile.id, { base_url: event.target.value })}
+                            onChange={(event) =>
+                              updateProfile(profile.id, {
+                                base_url: event.target.value,
+                              })
+                            }
                             className="mt-1.5 w-full rounded-2xl border border-black/10 bg-white px-3 py-2.5 text-sm text-surface-900 outline-none focus:border-surface-500"
                           />
                         </label>
@@ -299,12 +380,26 @@ export function SettingsDialog({ open, settings, onClose, onSave, displayTheme, 
                             value={profileKeyDrafts[profile.id] ?? ''}
                             onChange={(event) => {
                               const value = event.target.value
-                              setProfileKeyDrafts((prev) => ({ ...prev, [profile.id]: value }))
-                              const apiKeys = value.split('\n').map((item) => item.trim()).filter(Boolean)
-                              updateProfile(profile.id, { api_keys: apiKeys, api_key: '', has_api_key: apiKeys.length > 0 })
+                              setProfileKeyDrafts((prev) => ({
+                                ...prev,
+                                [profile.id]: value,
+                              }))
+                              const apiKeys = value
+                                .split('\n')
+                                .map((item) => item.trim())
+                                .filter(Boolean)
+                              updateProfile(profile.id, {
+                                api_keys: apiKeys,
+                                api_key: '',
+                                has_api_key: apiKeys.length > 0,
+                              })
                             }}
                             rows={4}
-                            placeholder={getProfileKeyCount(profile) > 0 ? '已安全保存；输入新 Key 可全部替换' : '输入 API Key，每行一个'}
+                            placeholder={
+                              getProfileKeyCount(profile) > 0
+                                ? '已安全保存；输入新 Key 可全部替换'
+                                : '输入 API Key，每行一个'
+                            }
                             aria-label={`${profile.name} API Key`}
                             className="mt-1.5 w-full resize-y rounded-2xl border border-black/10 bg-white px-3 py-2.5 font-mono text-xs text-surface-900 outline-none focus:border-surface-500"
                           />
@@ -314,8 +409,15 @@ export function SettingsDialog({ open, settings, onClose, onSave, displayTheme, 
                           <input
                             value={(profile.models || []).join(', ')}
                             onChange={(event) => {
-                              const models = event.target.value.split(',').map((item) => item.trim()).filter(Boolean)
-                              updateProfile(profile.id, { models, default_model: models[0] || profile.default_model })
+                              const models = event.target.value
+                                .split(',')
+                                .map((item) => item.trim())
+                                .filter(Boolean)
+                              updateProfile(profile.id, {
+                                models,
+                                default_model:
+                                  models[0] || profile.default_model,
+                              })
                             }}
                             className="mt-1.5 w-full rounded-2xl border border-black/10 bg-white px-3 py-2.5 text-sm text-surface-900 outline-none focus:border-surface-500"
                           />
@@ -330,14 +432,22 @@ export function SettingsDialog({ open, settings, onClose, onSave, displayTheme, 
 
           {section === 'base' && (
             <div>
-              <h2 className="text-xl font-bold tracking-tight text-surface-950">基础信息</h2>
-              <p className="mt-1 text-sm text-surface-500">配置应用显示主题和新生成 PPT 的默认配色主题。</p>
+              <h2 className="text-xl font-bold tracking-tight text-surface-950">
+                基础信息
+              </h2>
+              <p className="mt-1 text-sm text-surface-500">
+                配置应用显示主题和新生成 PPT 的默认配色主题。
+              </p>
               <div className="mt-5 grid gap-4 md:grid-cols-2">
                 <label className="block text-sm font-semibold text-surface-600">
                   产品名称
                   <input
                     value={draft.basic.app_name}
-                    onChange={(event) => updateDraft({ basic: { ...draft.basic, app_name: event.target.value } })}
+                    onChange={(event) =>
+                      updateDraft({
+                        basic: { ...draft.basic, app_name: event.target.value },
+                      })
+                    }
                     className="mt-2 w-full rounded-2xl border border-black/10 bg-white px-3 py-2.5 text-sm outline-none focus:border-surface-500"
                   />
                 </label>
@@ -345,7 +455,14 @@ export function SettingsDialog({ open, settings, onClose, onSave, displayTheme, 
                   工作区标题
                   <input
                     value={draft.basic.workspace_title}
-                    onChange={(event) => updateDraft({ basic: { ...draft.basic, workspace_title: event.target.value } })}
+                    onChange={(event) =>
+                      updateDraft({
+                        basic: {
+                          ...draft.basic,
+                          workspace_title: event.target.value,
+                        },
+                      })
+                    }
                     className="mt-2 w-full rounded-2xl border border-black/10 bg-white px-3 py-2.5 text-sm outline-none focus:border-surface-500"
                   />
                 </label>
@@ -353,16 +470,27 @@ export function SettingsDialog({ open, settings, onClose, onSave, displayTheme, 
                   品牌副标题
                   <input
                     value={draft.basic.brand_tagline}
-                    onChange={(event) => updateDraft({ basic: { ...draft.basic, brand_tagline: event.target.value } })}
+                    onChange={(event) =>
+                      updateDraft({
+                        basic: {
+                          ...draft.basic,
+                          brand_tagline: event.target.value,
+                        },
+                      })
+                    }
                     className="mt-2 w-full rounded-2xl border border-black/10 bg-white px-3 py-2.5 text-sm outline-none focus:border-surface-500"
                   />
                 </label>
                 <label className="block text-sm font-semibold text-surface-600">
                   显示主题
-                  <p className="mt-1 text-xs font-normal leading-5 text-surface-400">控制软件界面的浅色或深色外观。</p>
+                  <p className="mt-1 text-xs font-normal leading-5 text-surface-400">
+                    控制软件界面的浅色或深色外观。
+                  </p>
                   <select
                     value={displayThemeDraft}
-                    onChange={(event) => setDisplayThemeDraft(event.target.value as DisplayTheme)}
+                    onChange={(event) =>
+                      setDisplayThemeDraft(event.target.value as DisplayTheme)
+                    }
                     className="mt-2 w-full rounded-2xl border border-black/10 bg-white px-3 py-2.5 text-sm outline-none focus:border-surface-500"
                     aria-label="显示主题"
                   >
@@ -373,10 +501,19 @@ export function SettingsDialog({ open, settings, onClose, onSave, displayTheme, 
                 </label>
                 <label className="block text-sm font-semibold text-surface-600">
                   PPT 配色主题
-                  <p className="mt-1 text-xs font-normal leading-5 text-surface-400">用于新生成的 PPT 页面配色，不会改变软件界面外观。</p>
+                  <p className="mt-1 text-xs font-normal leading-5 text-surface-400">
+                    用于新生成的 PPT 页面配色，不会改变软件界面外观。
+                  </p>
                   <select
                     value={draft.basic.default_theme}
-                    onChange={(event) => updateDraft({ basic: { ...draft.basic, default_theme: event.target.value } })}
+                    onChange={(event) =>
+                      updateDraft({
+                        basic: {
+                          ...draft.basic,
+                          default_theme: event.target.value,
+                        },
+                      })
+                    }
                     className="mt-2 w-full rounded-2xl border border-black/10 bg-white px-3 py-2.5 text-sm outline-none focus:border-surface-500"
                     aria-label="PPT 配色主题"
                   >
@@ -395,10 +532,17 @@ export function SettingsDialog({ open, settings, onClose, onSave, displayTheme, 
             <div>
               <div className="mb-5 flex items-start justify-between gap-4">
                 <div>
-                  <h2 className="text-xl font-bold tracking-tight text-surface-950">MCP 服务</h2>
-                  <p className="mt-1 text-sm text-surface-500">保存常用 MCP 服务的地址和启用状态，方便后续接入。</p>
+                  <h2 className="text-xl font-bold tracking-tight text-surface-950">
+                    MCP 服务
+                  </h2>
+                  <p className="mt-1 text-sm text-surface-500">
+                    保存常用 MCP 服务的地址和启用状态，方便后续接入。
+                  </p>
                 </div>
-                <button onClick={addMcp} className="inline-flex items-center gap-1.5 rounded-full bg-surface-950 px-4 py-2 text-sm font-semibold text-white hover:bg-surface-800">
+                <button
+                  onClick={addMcp}
+                  className="inline-flex items-center gap-1.5 rounded-full bg-surface-950 px-4 py-2 text-sm font-semibold text-white hover:bg-surface-800"
+                >
                   <Plus className="h-4 w-4" />
                   添加服务
                 </button>
@@ -411,16 +555,23 @@ export function SettingsDialog({ open, settings, onClose, onSave, displayTheme, 
                   </div>
                 )}
                 {draft.mcp_servers.map((server) => (
-                  <div key={server.id} className="rounded-[1.6rem] border border-black/[0.06] bg-white/75 p-4 shadow-sm">
+                  <div
+                    key={server.id}
+                    className="rounded-[1.6rem] border border-black/[0.06] bg-white/75 p-4 shadow-sm"
+                  >
                     <div className="mb-4 flex items-start justify-between gap-3">
                       <div className="min-w-0 flex-1">
                         <input
                           value={server.name}
-                          onChange={(event) => updateMcp(server.id, { name: event.target.value })}
+                          onChange={(event) =>
+                            updateMcp(server.id, { name: event.target.value })
+                          }
                           className="w-full bg-transparent text-base font-bold text-surface-950 outline-none"
                           placeholder="服务名称"
                         />
-                        <div className="mt-1 text-[11px] text-surface-400">{server.enabled ? '已启用' : '已停用'}</div>
+                        <div className="mt-1 text-[11px] text-surface-400">
+                          {server.enabled ? '已启用' : '已停用'}
+                        </div>
                       </div>
                       <div className="flex items-center gap-2">
                         <button
@@ -429,17 +580,27 @@ export function SettingsDialog({ open, settings, onClose, onSave, displayTheme, 
                           disabled={testingMcpId === server.id}
                           className="rounded-full border border-black/10 bg-white px-3 py-1 text-xs font-semibold text-surface-600 hover:bg-surface-50 disabled:cursor-not-allowed disabled:opacity-50"
                         >
-                          {testingMcpId === server.id ? '测试中...' : '测试连接'}
+                          {testingMcpId === server.id
+                            ? '测试中...'
+                            : '测试连接'}
                         </button>
                         <label className="flex items-center gap-2 text-xs font-semibold text-surface-500">
                           <input
                             type="checkbox"
                             checked={server.enabled}
-                            onChange={(event) => updateMcp(server.id, { enabled: event.target.checked })}
+                            onChange={(event) =>
+                              updateMcp(server.id, {
+                                enabled: event.target.checked,
+                              })
+                            }
                           />
                           启用
                         </label>
-                        <button onClick={() => removeMcp(server.id)} className="rounded-full p-2 text-surface-400 hover:bg-red-50 hover:text-red-600" title="删除服务">
+                        <button
+                          onClick={() => removeMcp(server.id)}
+                          className="rounded-full p-2 text-surface-400 hover:bg-red-50 hover:text-red-600"
+                          title="删除服务"
+                        >
                           <Trash2 className="h-4 w-4" />
                         </button>
                       </div>
@@ -450,7 +611,11 @@ export function SettingsDialog({ open, settings, onClose, onSave, displayTheme, 
                         传输方式
                         <select
                           value={server.transport}
-                          onChange={(event) => updateMcp(server.id, { transport: event.target.value })}
+                          onChange={(event) =>
+                            updateMcp(server.id, {
+                              transport: event.target.value,
+                            })
+                          }
                           className="mt-1.5 w-full rounded-2xl border border-black/10 bg-white px-3 py-2.5 text-sm outline-none focus:border-surface-500"
                         >
                           <option value="http">HTTP</option>
@@ -462,7 +627,11 @@ export function SettingsDialog({ open, settings, onClose, onSave, displayTheme, 
                         服务地址
                         <input
                           value={server.endpoint}
-                          onChange={(event) => updateMcp(server.id, { endpoint: event.target.value })}
+                          onChange={(event) =>
+                            updateMcp(server.id, {
+                              endpoint: event.target.value,
+                            })
+                          }
                           className="mt-1.5 w-full rounded-2xl border border-black/10 bg-white px-3 py-2.5 text-sm outline-none focus:border-surface-500"
                         />
                       </label>
@@ -470,18 +639,27 @@ export function SettingsDialog({ open, settings, onClose, onSave, displayTheme, 
                         描述
                         <input
                           value={server.description || ''}
-                          onChange={(event) => updateMcp(server.id, { description: event.target.value })}
+                          onChange={(event) =>
+                            updateMcp(server.id, {
+                              description: event.target.value,
+                            })
+                          }
                           className="mt-1.5 w-full rounded-2xl border border-black/10 bg-white px-3 py-2.5 text-sm outline-none focus:border-surface-500"
                         />
                       </label>
                     </div>
 
                     {mcpTestResults[server.id] && (
-                      <div className={`mt-3 rounded-2xl border px-3 py-2 text-xs ${mcpTestResults[server.id].ok ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-red-200 bg-red-50 text-red-600'}`}>
-                        <div className="font-semibold">{mcpTestResults[server.id].message}</div>
+                      <div
+                        className={`mt-3 rounded-2xl border px-3 py-2 text-xs ${mcpTestResults[server.id].ok ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-red-200 bg-red-50 text-red-600'}`}
+                      >
+                        <div className="font-semibold">
+                          {mcpTestResults[server.id].message}
+                        </div>
                         {mcpTestResults[server.id].tools.length > 0 && (
                           <div className="mt-1 text-[11px]">
-                            可用工具：{mcpTestResults[server.id].tools.join(' / ')}
+                            可用工具：
+                            {mcpTestResults[server.id].tools.join(' / ')}
                           </div>
                         )}
                       </div>
@@ -493,7 +671,10 @@ export function SettingsDialog({ open, settings, onClose, onSave, displayTheme, 
           )}
 
           <div className="mt-6 flex items-center justify-end gap-3 border-t border-black/[0.06] pt-5">
-            <button onClick={onClose} className="rounded-full border border-black/10 bg-white px-4 py-2 text-sm font-semibold text-surface-600 hover:bg-surface-50">
+            <button
+              onClick={onClose}
+              className="rounded-full border border-black/10 bg-white px-4 py-2 text-sm font-semibold text-surface-600 hover:bg-surface-50"
+            >
               取消
             </button>
             <button

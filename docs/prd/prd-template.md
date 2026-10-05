@@ -11,8 +11,8 @@
 - Business: <measurable goal>
 - Strategic Fit: <related strategic objective>
 - Success Metrics:
-    - <metric 1>
-    - <metric 2>
+  - <metric 1>
+  - <metric 2>
 
 ## Background
 

@@ -21,6 +21,20 @@ merging. Local hooks and workflow files alone do not enforce branch protection.
 Pre-existing formatting, Clippy or dependency findings must be addressed before
 these gates can pass. No advisories are silently ignored.
 
+### Database dependency security
+
+SQLx 0.9 makes MySQL's non-TLS RSA password authentication optional. This project
+keeps `mysql-rsa` disabled, removing the vulnerable `rsa` dependency associated
+with `RUSTSEC-2023-0071`, and enables rustls with native certificate roots.
+MySQL users should configure server TLS and set `ssl-mode=verify_identity` in
+`DATABASE_URL`; the certificate must match the hostname and be trusted by the
+system, or supplied with `ssl-ca`. Connections needing RSA authentication without
+TLS now fail instead of enabling the vulnerable dependency. SQLite is unchanged.
+
+`cargo audit --file src-tauri/Cargo.lock` remains the regression gate. Unmaintained
+or unsound transitive dependency warnings are still reported; an audit exit code
+of zero is not a claim that every dependency is maintained or risk-free.
+
 ## Windows releases
 
 `.github/workflows/release.yml` runs when a `v*` tag is pushed. It first runs the

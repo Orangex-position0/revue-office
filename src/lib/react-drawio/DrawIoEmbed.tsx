@@ -3,13 +3,13 @@ import {
   useEffect,
   useImperativeHandle,
   useRef,
-  useState
-} from 'react';
-import { ActionLoad, DrawIoEmbedProps, DrawIoEmbedRef } from './types';
-import { getEmbedUrl } from './utils/getEmbedUrl';
-import { handleEvent } from './utils/handleEvent';
-import { UniqueActionProps, useActions } from './hooks/useActions';
-import React from 'react';
+  useState,
+} from 'react'
+import { ActionLoad, DrawIoEmbedProps, DrawIoEmbedRef } from './types'
+import { getEmbedUrl } from './utils/getEmbedUrl'
+import { handleEvent } from './utils/handleEvent'
+import { UniqueActionProps, useActions } from './hooks/useActions'
+import React from 'react'
 
 export const DrawIoEmbed = forwardRef<DrawIoEmbedRef, DrawIoEmbedProps>(
   (props, ref) => {
@@ -30,38 +30,38 @@ export const DrawIoEmbed = forwardRef<DrawIoEmbedRef, DrawIoEmbedProps>(
       onExport,
       onMerge,
       onPrompt,
-      onTemplate
-    } = props;
+      onTemplate,
+    } = props
 
-    const iframeRef = useRef<HTMLIFrameElement>(null);
-    const action = useActions(iframeRef);
-    const iframeUrl = getEmbedUrl(baseUrl, urlParameters, !!configuration);
-    const [isInitialized, setIsInitialized] = useState(false);
+    const iframeRef = useRef<HTMLIFrameElement>(null)
+    const action = useActions(iframeRef)
+    const iframeUrl = getEmbedUrl(baseUrl, urlParameters, !!configuration)
+    const [isInitialized, setIsInitialized] = useState(false)
 
     const messageHandler = (evt: MessageEvent) => {
       handleEvent(
         evt,
         {
           init: () => {
-            setIsInitialized(true);
+            setIsInitialized(true)
           },
           load: (data) => {
             if (onLoad) {
-              onLoad(data);
+              onLoad(data)
             }
           },
           configure: (data) => {
             if (configuration) {
-              action.configure({ config: configuration });
+              action.configure({ config: configuration })
             }
 
             if (onConfigure) {
-              onConfigure(data);
+              onConfigure(data)
             }
           },
           autosave: (data) => {
             if (onAutoSave) {
-              onAutoSave(data);
+              onAutoSave(data)
             }
           },
           save: (data) => {
@@ -69,17 +69,17 @@ export const DrawIoEmbed = forwardRef<DrawIoEmbedRef, DrawIoEmbedProps>(
               format: exportFormat || 'xmlsvg',
               // @ts-expect-error draw.io export action accepts internal metadata not covered by local types
               exit: data.exit,
-              parentEvent: 'save'
-            });
+              parentEvent: 'save',
+            })
           },
           exit: (data) => {
             if (onClose) {
-              onClose(data);
+              onClose(data)
             }
           },
           draft: (data) => {
             if (onDraft) {
-              onDraft(data);
+              onDraft(data)
             }
           },
           export: (data) => {
@@ -87,12 +87,12 @@ export const DrawIoEmbed = forwardRef<DrawIoEmbedRef, DrawIoEmbedProps>(
               onSave({
                 event: 'save',
                 xml: data.data,
-                parentEvent: data.message.parentEvent || 'export'
-              });
+                parentEvent: data.message.parentEvent || 'export',
+              })
             }
 
             if (onExport) {
-              onExport(data);
+              onExport(data)
             }
 
             // @ts-expect-error draw.io export event includes internal message metadata not covered by local types
@@ -100,73 +100,73 @@ export const DrawIoEmbed = forwardRef<DrawIoEmbedRef, DrawIoEmbedProps>(
               onClose({
                 event: 'exit',
                 modified: true,
-                parentEvent: data.message.parentEvent || 'export'
-              });
+                parentEvent: data.message.parentEvent || 'export',
+              })
             }
           },
           merge: (data) => {
             if (onMerge) {
-              onMerge(data);
+              onMerge(data)
             }
           },
           prompt: (data) => {
             if (onPrompt) {
-              onPrompt(data);
+              onPrompt(data)
             }
           },
           template: (data) => {
             if (onTemplate) {
-              onTemplate(data);
+              onTemplate(data)
             }
-          }
+          },
         },
-        baseUrl
-      );
-    };
+        baseUrl,
+      )
+    }
 
     useImperativeHandle(
       ref,
       () => ({
-        ...action
+        ...action,
       }),
-      []
-    );
+      [],
+    )
 
     useEffect(() => {
       // The object is incrementally assembled for the draw.io load action.
       // eslint-disable-next-line no-useless-assignment
-      let loadObject: UniqueActionProps<ActionLoad> = {};
+      let loadObject: UniqueActionProps<ActionLoad> = {}
 
       if (isInitialized) {
         if (xml) {
           if (exportFormat === 'xmlpng') {
-            loadObject = { xmlpng: xml };
+            loadObject = { xmlpng: xml }
           } else {
-            loadObject = { xml };
+            loadObject = { xml }
           }
         } else if (csv) {
-          loadObject = { descriptor: { format: 'csv', data: csv } };
+          loadObject = { descriptor: { format: 'csv', data: csv } }
         } else {
-          loadObject = { xml: '' };
+          loadObject = { xml: '' }
         }
 
         loadObject = {
           ...loadObject,
-          autosave: autosave
-        };
+          autosave: autosave,
+        }
 
-        action.load(loadObject);
+        action.load(loadObject)
       }
-    }, [isInitialized, xml, csv, autosave]);
+    }, [isInitialized, xml, csv, autosave])
 
     // Initial load
     useEffect(() => {
-      window.addEventListener('message', messageHandler);
+      window.addEventListener('message', messageHandler)
 
       return () => {
-        window.removeEventListener('message', messageHandler);
-      };
-    }, []);
+        window.removeEventListener('message', messageHandler)
+      }
+    }, [])
 
     return (
       <iframe
@@ -180,9 +180,9 @@ export const DrawIoEmbed = forwardRef<DrawIoEmbedRef, DrawIoEmbedProps>(
           height: '100%',
           minWidth: '400px',
           minHeight: '400px',
-          border: 'none'
+          border: 'none',
         }}
       />
-    );
-  }
-);
+    )
+  },
+)

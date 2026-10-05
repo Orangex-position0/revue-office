@@ -13,9 +13,10 @@ function getGuestDeviceId() {
   const existing = window.localStorage.getItem(key)
   if (existing) return existing
 
-  const deviceId = typeof crypto.randomUUID === 'function'
-    ? crypto.randomUUID()
-    : `${Date.now()}-${Math.random().toString(36).slice(2)}`
+  const deviceId =
+    typeof crypto.randomUUID === 'function'
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).slice(2)}`
   window.localStorage.setItem(key, deviceId)
   return deviceId
 }
@@ -34,9 +35,11 @@ function App() {
 
     setBootstrapping(true)
     setBootstrapError(null)
-    guestBootstrapPromise ||= authApi.guestLogin(getGuestDeviceId()).then(({ data }) => {
-      login(data.access_token, data.user)
-    })
+    guestBootstrapPromise ||= authApi
+      .guestLogin(getGuestDeviceId())
+      .then(({ data }) => {
+        login(data.access_token, data.user)
+      })
     guestBootstrapPromise
       .catch(() => {
         setBootstrapError('工作区准备失败，请检查后端服务后重试。')

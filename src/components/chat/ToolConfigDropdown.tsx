@@ -31,7 +31,10 @@ export function ToolConfigDropdown({
   useEffect(() => {
     if (!open) return
     const handleClickOutside = (e: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(e.target as Node)
+      ) {
         setOpen(false)
       }
     }
@@ -105,13 +108,31 @@ export function ToolConfigDropdown({
           }
         `}
       >
-        <Settings2 className={`h-3.5 w-3.5 ${open ? 'text-indigo-500' : hasNonDefault ? 'text-amber-500' : 'text-surface-400'}`} />
-        <span className={open ? 'text-indigo-500' : hasNonDefault ? 'text-amber-500' : 'text-surface-500'}>配置</span>
-        <span className={`font-semibold ${open ? 'text-indigo-700' : 'text-surface-900'}`}>{firstLabel}</span>
+        <Settings2
+          className={`h-3.5 w-3.5 ${open ? 'text-indigo-500' : hasNonDefault ? 'text-amber-500' : 'text-surface-400'}`}
+        />
+        <span
+          className={
+            open
+              ? 'text-indigo-500'
+              : hasNonDefault
+                ? 'text-amber-500'
+                : 'text-surface-500'
+          }
+        >
+          配置
+        </span>
+        <span
+          className={`font-semibold ${open ? 'text-indigo-700' : 'text-surface-900'}`}
+        >
+          {firstLabel}
+        </span>
         {hasNonDefault && !open && (
           <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
         )}
-        <ChevronDown className={`h-3 w-3 ${open ? 'text-indigo-400' : 'text-surface-400'} transition-transform ${open ? 'rotate-180' : ''}`} />
+        <ChevronDown
+          className={`h-3 w-3 ${open ? 'text-indigo-400' : 'text-surface-400'} transition-transform ${open ? 'rotate-180' : ''}`}
+        />
       </button>
 
       {open && (
@@ -128,8 +149,18 @@ export function ToolConfigDropdown({
               onClick={() => setOpen(false)}
               className="text-gray-400 hover:text-gray-600 transition-colors"
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M6 18L18 6M6 6l12 12"
+                />
               </svg>
             </button>
           </div>
@@ -145,7 +176,8 @@ export function ToolConfigDropdown({
                 {opt.type === 'select' && opt.options && (
                   <div className="flex flex-wrap gap-1.5">
                     {opt.options.map((option) => {
-                      const currentValue = toolConfig[opt.key] ?? opt.defaultValue
+                      const currentValue =
+                        toolConfig[opt.key] ?? opt.defaultValue
                       const isActive = currentValue === option.value
                       return (
                         <button
@@ -153,9 +185,10 @@ export function ToolConfigDropdown({
                           onClick={() => handleChange(opt.key, option.value)}
                           className={`
                             flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-medium transition-all
-                            ${isActive
-                              ? 'bg-indigo-500 text-white shadow-sm'
-                              : 'bg-gray-50 text-surface-600 hover:bg-indigo-50 border border-gray-100'
+                            ${
+                              isActive
+                                ? 'bg-indigo-500 text-white shadow-sm'
+                                : 'bg-gray-50 text-surface-600 hover:bg-indigo-50 border border-gray-100'
                             }
                           `}
                           title={option.description}
@@ -169,7 +202,12 @@ export function ToolConfigDropdown({
 
                 {opt.type === 'toggle' && (
                   <button
-                    onClick={() => handleChange(opt.key, !(toolConfig[opt.key] ?? opt.defaultValue))}
+                    onClick={() =>
+                      handleChange(
+                        opt.key,
+                        !(toolConfig[opt.key] ?? opt.defaultValue),
+                      )
+                    }
                     className={`
                       relative inline-flex h-5 w-9 items-center rounded-full transition-colors
                       ${(toolConfig[opt.key] ?? opt.defaultValue) ? 'bg-indigo-500' : 'bg-gray-300'}
@@ -196,7 +234,9 @@ export function ToolConfigDropdown({
                   className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] bg-gray-100 text-surface-500"
                 >
                   <span className="font-medium">{opt.label}</span>
-                  <span className="text-surface-700">{getActiveLabel(opt)}</span>
+                  <span className="text-surface-700">
+                    {getActiveLabel(opt)}
+                  </span>
                 </span>
               ))}
             </div>

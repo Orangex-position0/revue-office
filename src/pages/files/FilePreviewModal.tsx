@@ -1,5 +1,17 @@
 import { useEffect, useState } from 'react'
-import { X, Download, ChevronLeft, ChevronRight, FileText, FileSpreadsheet, FileType, FileCode, File as FileIcon, ChevronDown, Play } from 'lucide-react'
+import {
+  X,
+  Download,
+  ChevronLeft,
+  ChevronRight,
+  FileText,
+  FileSpreadsheet,
+  FileType,
+  FileCode,
+  File as FileIcon,
+  ChevronDown,
+  Play,
+} from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { fileApi } from '@/api'
@@ -32,7 +44,11 @@ function PptStructuredPreview({ data }: { data: any }) {
   const [currentSlide, setCurrentSlide] = useState(0)
 
   if (slides.length === 0) {
-    return <div className="text-center text-surface-400 py-20">此演示文稿暂无可预览的内容</div>
+    return (
+      <div className="text-center text-surface-400 py-20">
+        此演示文稿暂无可预览的内容
+      </div>
+    )
   }
 
   const slide = slides[currentSlide]
@@ -103,7 +119,9 @@ function PptStructuredPreview({ data }: { data: any }) {
           {currentSlide + 1} / {slides.length}
         </span>
         <button
-          onClick={() => setCurrentSlide(Math.min(slides.length - 1, currentSlide + 1))}
+          onClick={() =>
+            setCurrentSlide(Math.min(slides.length - 1, currentSlide + 1))
+          }
           disabled={currentSlide === slides.length - 1}
           className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-white disabled:opacity-30 hover:bg-white/20 transition"
         >
@@ -120,7 +138,11 @@ function ExcelStructuredPreview({ data }: { data: any }) {
   const [currentSheet, setCurrentSheet] = useState(0)
 
   if (sheets.length === 0) {
-    return <div className="text-center text-surface-400 py-20">此表格暂无可预览的内容</div>
+    return (
+      <div className="text-center text-surface-400 py-20">
+        此表格暂无可预览的内容
+      </div>
+    )
   }
 
   const sheet = sheets[currentSheet]
@@ -153,7 +175,16 @@ function ExcelStructuredPreview({ data }: { data: any }) {
           <table className="w-full border-collapse text-sm">
             <tbody>
               {rows.map((row: string[], ri: number) => (
-                <tr key={ri} className={ri === 0 ? 'bg-surface-100 font-semibold' : ri % 2 === 1 ? 'bg-surface-50' : ''}>
+                <tr
+                  key={ri}
+                  className={
+                    ri === 0
+                      ? 'bg-surface-100 font-semibold'
+                      : ri % 2 === 1
+                        ? 'bg-surface-50'
+                        : ''
+                  }
+                >
                   {row.map((cell: string, ci: number) => (
                     <td
                       key={ci}
@@ -187,7 +218,11 @@ function DocStructuredPreview({ data }: { data: any }) {
   const sections = data?.sections || []
 
   if (sections.length === 0) {
-    return <div className="text-center text-surface-400 py-20">此文档暂无可预览的内容</div>
+    return (
+      <div className="text-center text-surface-400 py-20">
+        此文档暂无可预览的内容
+      </div>
+    )
   }
 
   return (
@@ -202,8 +237,16 @@ function DocStructuredPreview({ data }: { data: any }) {
       >
         {/* 文档标题 */}
         {data.title && (
-          <div className="mb-8 pb-6 text-center" style={{ borderBottom: '2px solid #e5e7eb' }}>
-            <h1 className="text-2xl font-bold text-gray-900" style={{ fontFamily: '"SimHei", "黑体", "Noto Sans SC", sans-serif' }}>
+          <div
+            className="mb-8 pb-6 text-center"
+            style={{ borderBottom: '2px solid #e5e7eb' }}
+          >
+            <h1
+              className="text-2xl font-bold text-gray-900"
+              style={{
+                fontFamily: '"SimHei", "黑体", "Noto Sans SC", sans-serif',
+              }}
+            >
               {data.title}
             </h1>
           </div>
@@ -214,13 +257,20 @@ function DocStructuredPreview({ data }: { data: any }) {
           {sections.map((sec: any, i: number) => {
             if (sec.type === 'heading') {
               const level = sec.level || 1
-              const cls = level === 1
-                ? 'mb-3 mt-6 text-xl font-bold text-gray-900'
-                : level === 2
-                  ? 'mb-2 mt-5 text-lg font-semibold text-gray-800'
-                  : 'mb-2 mt-4 text-base font-semibold text-gray-700'
+              const cls =
+                level === 1
+                  ? 'mb-3 mt-6 text-xl font-bold text-gray-900'
+                  : level === 2
+                    ? 'mb-2 mt-5 text-lg font-semibold text-gray-800'
+                    : 'mb-2 mt-4 text-base font-semibold text-gray-700'
               return (
-                <h2 key={i} className={cls} style={{ fontFamily: '"SimHei", "黑体", "Noto Sans SC", sans-serif' }}>
+                <h2
+                  key={i}
+                  className={cls}
+                  style={{
+                    fontFamily: '"SimHei", "黑体", "Noto Sans SC", sans-serif',
+                  }}
+                >
                   {sec.text}
                 </h2>
               )
@@ -229,7 +279,9 @@ function DocStructuredPreview({ data }: { data: any }) {
               return (
                 <div key={i} className="flex gap-2 pl-5">
                   <span className="text-gray-500 mt-0.5">•</span>
-                  <span className="text-[14px] leading-[1.8] text-gray-700">{sec.text}</span>
+                  <span className="text-[14px] leading-[1.8] text-gray-700">
+                    {sec.text}
+                  </span>
                 </div>
               )
             }
@@ -242,7 +294,10 @@ function DocStructuredPreview({ data }: { data: any }) {
                     <thead>
                       <tr>
                         {headers.map((h: string, ci: number) => (
-                          <th key={ci} className="border border-gray-300 bg-gray-100 px-3 py-2 text-left font-semibold text-gray-800">
+                          <th
+                            key={ci}
+                            className="border border-gray-300 bg-gray-100 px-3 py-2 text-left font-semibold text-gray-800"
+                          >
                             {h}
                           </th>
                         ))}
@@ -250,9 +305,15 @@ function DocStructuredPreview({ data }: { data: any }) {
                     </thead>
                     <tbody>
                       {bodyRows.map((row: string[], ri: number) => (
-                        <tr key={ri} className={ri % 2 === 1 ? 'bg-gray-50' : ''}>
+                        <tr
+                          key={ri}
+                          className={ri % 2 === 1 ? 'bg-gray-50' : ''}
+                        >
                           {row.map((cell: string, ci: number) => (
-                            <td key={ci} className="border border-gray-300 px-3 py-2 text-gray-700">
+                            <td
+                              key={ci}
+                              className="border border-gray-300 px-3 py-2 text-gray-700"
+                            >
                               {cell}
                             </td>
                           ))}
@@ -265,7 +326,10 @@ function DocStructuredPreview({ data }: { data: any }) {
             }
             // paragraph
             return (
-              <p key={i} className="mb-3 text-[14px] leading-[1.8] text-gray-700">
+              <p
+                key={i}
+                className="mb-3 text-[14px] leading-[1.8] text-gray-700"
+              >
                 {sec.text}
               </p>
             )
@@ -273,7 +337,10 @@ function DocStructuredPreview({ data }: { data: any }) {
         </div>
 
         {/* 页脚 */}
-        <div className="mt-12 pt-4 text-center text-[11px] text-gray-400" style={{ borderTop: '1px solid #e5e7eb' }}>
+        <div
+          className="mt-12 pt-4 text-center text-[11px] text-gray-400"
+          style={{ borderTop: '1px solid #e5e7eb' }}
+        >
           — revueOffice 文档预览 · 下载获取完整排版 —
         </div>
       </div>
@@ -296,12 +363,13 @@ function VideoPreview({ videoUrl, name }: { videoUrl: string; name: string }) {
     setError('视频加载失败，请尝试下载后查看')
   }
 
-  if (error) return (
-    <div className="flex flex-col items-center justify-center py-20 text-center">
-      <Play className="h-12 w-12 text-surface-300 mb-3" />
-      <p className="text-sm text-surface-300">{error}</p>
-    </div>
-  )
+  if (error)
+    return (
+      <div className="flex flex-col items-center justify-center py-20 text-center">
+        <Play className="h-12 w-12 text-surface-300 mb-3" />
+        <p className="text-sm text-surface-300">{error}</p>
+      </div>
+    )
 
   return (
     <div className="flex flex-col items-center w-full max-w-5xl mx-auto">
@@ -319,7 +387,13 @@ function VideoPreview({ videoUrl, name }: { videoUrl: string; name: string }) {
   )
 }
 
-export function FilePreviewModal({ file, onClose, onPrev, onNext, onDownload }: FilePreviewModalProps) {
+export function FilePreviewModal({
+  file,
+  onClose,
+  onPrev,
+  onNext,
+  onDownload,
+}: FilePreviewModalProps) {
   const [preview, setPreview] = useState<PreviewData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -329,17 +403,20 @@ export function FilePreviewModal({ file, onClose, onPrev, onNext, onDownload }: 
     setLoading(true)
     setError('')
     setPreview(null)
-    fileApi.preview(file.id)
-      .then(res => {
+    fileApi
+      .preview(file.id)
+      .then((res) => {
         if (!cancelled) setPreview(res.data)
       })
-      .catch(err => {
+      .catch((err) => {
         if (!cancelled) setError(err?.response?.data?.detail || '预览加载失败')
       })
       .finally(() => {
         if (!cancelled) setLoading(false)
       })
-    return () => { cancelled = true }
+    return () => {
+      cancelled = true
+    }
   }, [file.id])
 
   useEffect(() => {
@@ -354,21 +431,34 @@ export function FilePreviewModal({ file, onClose, onPrev, onNext, onDownload }: 
 
   const fileTypeLabel = (t: string) => {
     const map: Record<string, string> = {
-      ppt: 'PPT 演示文稿', doc: 'Word 文档', document: 'Word 文档',
-      excel: 'Excel 表格', sheet: 'Excel 表格', image: '图片',
-      video: '视频', drawio: 'Draw.io 图表', code: '代码', other: '文件',
+      ppt: 'PPT 演示文稿',
+      doc: 'Word 文档',
+      document: 'Word 文档',
+      excel: 'Excel 表格',
+      sheet: 'Excel 表格',
+      image: '图片',
+      video: '视频',
+      drawio: 'Draw.io 图表',
+      code: '代码',
+      other: '文件',
     }
     return map[t] || '文件'
   }
 
   const renderPreview = () => {
-    if (loading) return <div className="flex items-center justify-center py-20 text-surface-300">加载预览中...</div>
-    if (error) return (
-      <div className="flex flex-col items-center justify-center py-20 text-center">
-        <FileIcon className="h-12 w-12 text-surface-300 mb-3" />
-        <p className="text-sm text-surface-300">{error}</p>
-      </div>
-    )
+    if (loading)
+      return (
+        <div className="flex items-center justify-center py-20 text-surface-300">
+          加载预览中...
+        </div>
+      )
+    if (error)
+      return (
+        <div className="flex flex-col items-center justify-center py-20 text-center">
+          <FileIcon className="h-12 w-12 text-surface-300 mb-3" />
+          <p className="text-sm text-surface-300">{error}</p>
+        </div>
+      )
     if (!preview) return null
 
     const pt = preview.preview_type
@@ -396,7 +486,9 @@ export function FilePreviewModal({ file, onClose, onPrev, onNext, onDownload }: 
       return (
         <div className="w-full">
           <div className="rounded-xl border border-white/15 bg-white/5 p-4">
-            <p className="mb-3 text-sm font-medium text-white/70">Draw.io XML 源码</p>
+            <p className="mb-3 text-sm font-medium text-white/70">
+              Draw.io XML 源码
+            </p>
             <pre className="max-h-[70vh] overflow-auto rounded-lg bg-white/90 p-4 text-xs leading-relaxed text-surface-700">
               {preview.text}
             </pre>
@@ -410,7 +502,9 @@ export function FilePreviewModal({ file, onClose, onPrev, onNext, onDownload }: 
       return (
         <div className="mx-auto max-w-4xl w-full">
           <div className="rounded-2xl border border-surface-200 bg-white p-8 shadow-sm">
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>{preview.text}</ReactMarkdown>
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+              {preview.text}
+            </ReactMarkdown>
           </div>
         </div>
       )
@@ -438,12 +532,25 @@ export function FilePreviewModal({ file, onClose, onPrev, onNext, onDownload }: 
         <div className="mx-auto max-w-4xl w-full">
           <div className="rounded-2xl border border-surface-200 bg-white p-6 shadow-sm">
             <div className="mb-4 flex items-center gap-2 border-b border-surface-200 pb-3">
-              {preview.file_type === 'excel' && <FileSpreadsheet className="h-5 w-5 text-emerald-500" />}
-              {preview.file_type === 'ppt' && <FileType className="h-5 w-5 text-orange-500" />}
-              {(preview.file_type === 'doc' || preview.file_type === 'document') && <FileText className="h-5 w-5 text-blue-500" />}
-              {preview.file_type === 'drawio' && <FileCode className="h-5 w-5 text-amber-500" />}
-              <span className="text-sm font-semibold text-surface-800">{preview.name}</span>
-              <span className="ml-auto text-xs text-surface-400">{lines.length} 行提取文本</span>
+              {preview.file_type === 'excel' && (
+                <FileSpreadsheet className="h-5 w-5 text-emerald-500" />
+              )}
+              {preview.file_type === 'ppt' && (
+                <FileType className="h-5 w-5 text-orange-500" />
+              )}
+              {(preview.file_type === 'doc' ||
+                preview.file_type === 'document') && (
+                <FileText className="h-5 w-5 text-blue-500" />
+              )}
+              {preview.file_type === 'drawio' && (
+                <FileCode className="h-5 w-5 text-amber-500" />
+              )}
+              <span className="text-sm font-semibold text-surface-800">
+                {preview.name}
+              </span>
+              <span className="ml-auto text-xs text-surface-400">
+                {lines.length} 行提取文本
+              </span>
             </div>
             <pre className="max-h-[70vh] overflow-auto whitespace-pre-wrap rounded-lg bg-surface-50 p-4 text-sm leading-relaxed text-surface-700">
               {preview.text}
@@ -462,9 +569,15 @@ export function FilePreviewModal({ file, onClose, onPrev, onNext, onDownload }: 
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-black/70 backdrop-blur-sm" onClick={onClose}>
+    <div
+      className="fixed inset-0 z-50 flex flex-col bg-black/70 backdrop-blur-sm"
+      onClick={onClose}
+    >
       {/* 预览区 — 占满主体空间 */}
-      <div className="flex-1 overflow-auto flex flex-col items-center justify-start pt-8 px-4" onClick={e => e.stopPropagation()}>
+      <div
+        className="flex-1 overflow-auto flex flex-col items-center justify-start pt-8 px-4"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="mx-auto w-full max-w-6xl flex flex-col items-center">
           {renderPreview()}
         </div>
@@ -473,11 +586,15 @@ export function FilePreviewModal({ file, onClose, onPrev, onNext, onDownload }: 
       {/* 底部操作栏 — 始终在底部可见，包含文件名、切换、下载、关闭 */}
       <div
         className="shrink-0 flex items-center justify-center gap-3 px-6 py-4 bg-black/40 backdrop-blur-md"
-        onClick={e => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
       >
         {/* 上一个 */}
         {onPrev && (
-          <button onClick={onPrev} className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20 transition" title="上一个 (←)">
+          <button
+            onClick={onPrev}
+            className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20 transition"
+            title="上一个 (←)"
+          >
             <ChevronLeft className="h-5 w-5" />
           </button>
         )}
@@ -488,8 +605,13 @@ export function FilePreviewModal({ file, onClose, onPrev, onNext, onDownload }: 
             <FileIcon className="h-4.5 w-4.5 text-white" />
           </div>
           <div className="min-w-0 hidden sm:block">
-            <p className="truncate max-w-[200px] text-sm font-medium text-white">{file.name}</p>
-            <p className="text-[11px] text-white/50">{fileTypeLabel(file.file_type)} · {(file.file_size / 1024).toFixed(1)} KB</p>
+            <p className="truncate max-w-[200px] text-sm font-medium text-white">
+              {file.name}
+            </p>
+            <p className="text-[11px] text-white/50">
+              {fileTypeLabel(file.file_type)} ·{' '}
+              {(file.file_size / 1024).toFixed(1)} KB
+            </p>
           </div>
         </div>
 
@@ -513,7 +635,11 @@ export function FilePreviewModal({ file, onClose, onPrev, onNext, onDownload }: 
 
         {/* 下一个 */}
         {onNext && (
-          <button onClick={onNext} className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20 transition" title="下一个 (→)">
+          <button
+            onClick={onNext}
+            className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20 transition"
+            title="下一个 (→)"
+          >
             <ChevronRight className="h-5 w-5" />
           </button>
         )}

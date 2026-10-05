@@ -3,14 +3,42 @@ import type React from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuthStore } from '@/stores/auth-store'
 import { usePPTStore } from '@/stores/ppt-store'
-import { chatApi, docApi, excelApi, pptApi, sessionApi, projectApi, settingsApi, fileApi } from '@/api'
+import {
+  chatApi,
+  docApi,
+  excelApi,
+  pptApi,
+  sessionApi,
+  projectApi,
+  settingsApi,
+  fileApi,
+} from '@/api'
 import { ChatPanel } from '@/components/chat/ChatPanel'
 import { SlidePreview } from '@/components/preview/SlidePreview'
 import { ConversationSidebar } from '@/components/history/ConversationSidebar'
 import { ArtifactPanel } from '@/components/artifacts/ArtifactPanel'
 import { SettingsDialog } from '@/components/settings/SettingsDialog'
-import { AlertCircle, CheckCircle2, Info, Play, X, PanelRightClose, PanelRight } from 'lucide-react'
-import type { AppSettings, Artifact, ChatAttachment, ConversationRecord, DisplayTheme, LLMProfile, PersistedSession, ProjectMeta, ToolKind, ToolConfigMap } from '@/types'
+import {
+  AlertCircle,
+  CheckCircle2,
+  Info,
+  Play,
+  X,
+  PanelRightClose,
+  PanelRight,
+} from 'lucide-react'
+import type {
+  AppSettings,
+  Artifact,
+  ChatAttachment,
+  ConversationRecord,
+  DisplayTheme,
+  LLMProfile,
+  PersistedSession,
+  ProjectMeta,
+  ToolKind,
+  ToolConfigMap,
+} from '@/types'
 const LOGO_URL = '/logo.png'
 
 type ToastTone = 'success' | 'error' | 'info'
@@ -22,7 +50,11 @@ interface ToastState {
 
 function buildRestoredMessages(session: PersistedSession) {
   const restored = (session.messages || [])
-    .filter((msg) => (msg.role === 'user' || msg.role === 'assistant') && msg.content?.trim())
+    .filter(
+      (msg) =>
+        (msg.role === 'user' || msg.role === 'assistant') &&
+        msg.content?.trim(),
+    )
     .map((msg) => ({
       role: msg.role as 'user' | 'assistant',
       content: msg.content,
@@ -86,7 +118,9 @@ const DISPLAY_THEME_STORAGE_KEY = 'revue-office:display-theme'
 function getStoredDisplayTheme(): DisplayTheme {
   if (typeof window === 'undefined') return 'system'
   const value = window.localStorage.getItem(DISPLAY_THEME_STORAGE_KEY)
-  return value === 'light' || value === 'dark' || value === 'system' ? value : 'system'
+  return value === 'light' || value === 'dark' || value === 'system'
+    ? value
+    : 'system'
 }
 
 function getStoredSidebarWidth() {
@@ -98,7 +132,8 @@ function getStoredSidebarWidth() {
 
 function playConversationDoneSound() {
   try {
-    const AudioContextCtor = window.AudioContext || (window as any).webkitAudioContext
+    const AudioContextCtor =
+      window.AudioContext || (window as any).webkitAudioContext
     if (!AudioContextCtor) return
 
     const audioContext = new AudioContextCtor()
@@ -140,19 +175,28 @@ function loadImageElement(src: string) {
   })
 }
 
-function canvasToBlob(canvas: HTMLCanvasElement, type: string, quality?: number) {
+function canvasToBlob(
+  canvas: HTMLCanvasElement,
+  type: string,
+  quality?: number,
+) {
   return new Promise<Blob>((resolve, reject) => {
-    canvas.toBlob((blob) => {
-      if (blob) resolve(blob)
-      else reject(new Error('图片压缩失败'))
-    }, type, quality)
+    canvas.toBlob(
+      (blob) => {
+        if (blob) resolve(blob)
+        else reject(new Error('图片压缩失败'))
+      },
+      type,
+      quality,
+    )
   })
 }
 
 function blobToDataUrl(blob: Blob) {
   return new Promise<string>((resolve, reject) => {
     const reader = new FileReader()
-    reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : '')
+    reader.onload = () =>
+      resolve(typeof reader.result === 'string' ? reader.result : '')
     reader.onerror = () => reject(reader.error || new Error('图片转换失败'))
     reader.readAsDataURL(blob)
   })
@@ -163,11 +207,24 @@ export default function Studio() {
   const [searchParams, setSearchParams] = useSearchParams()
   const logout = useAuthStore((s) => s.logout)
   const {
-    project, slides, currentSlideIndex, messages,
-    isStreaming, sessionId, artifacts, activeArtifactId,
-    setProject, setSlides, setCurrentSlide,
-    addMessage, setStreaming, setSessionId, reset,
-    upsertArtifact, updateArtifact, setActiveArtifact,
+    project,
+    slides,
+    currentSlideIndex,
+    messages,
+    isStreaming,
+    sessionId,
+    artifacts,
+    activeArtifactId,
+    setProject,
+    setSlides,
+    setCurrentSlide,
+    addMessage,
+    setStreaming,
+    setSessionId,
+    reset,
+    upsertArtifact,
+    updateArtifact,
+    setActiveArtifact,
   } = usePPTStore()
 
   const [showArtifactPanel, setShowArtifactPanel] = useState(false)
@@ -181,11 +238,18 @@ export default function Studio() {
   const [activeView, setActiveView] = useState<'chat' | 'settings'>('chat')
   const [input, setInput] = useState('')
   const [selectedTheme, setSelectedTheme] = useState('default')
-  const [displayTheme, setDisplayTheme] = useState<DisplayTheme>(getStoredDisplayTheme)
+  const [displayTheme, setDisplayTheme] = useState<DisplayTheme>(
+    getStoredDisplayTheme,
+  )
   const [followLatestSlide, setFollowLatestSlide] = useState(true)
-  const [pptProgress, setPptProgress] = useState<{ current: number; total: number } | null>(null)
+  const [pptProgress, setPptProgress] = useState<{
+    current: number
+    total: number
+  } | null>(null)
   const [streamStatus, setStreamStatus] = useState('空闲')
-  const [streamPhase, setStreamPhase] = useState<'idle' | 'thinking' | 'generating' | 'finishing' | 'done' | 'error'>('idle')
+  const [streamPhase, setStreamPhase] = useState<
+    'idle' | 'thinking' | 'generating' | 'finishing' | 'done' | 'error'
+  >('idle')
   const [processLogs, setProcessLogs] = useState<string[]>([])
   const [attachments, setAttachments] = useState<ChatAttachment[]>([])
   const [toolConfig, setToolConfig] = useState<ToolConfigMap>({})
@@ -197,7 +261,8 @@ export default function Studio() {
   const [selectedModel, setSelectedModel] = useState<string>('')
   const [modelProfiles, setModelProfiles] = useState<LLMProfile[]>([])
 
-  const activeArtifact = artifacts.find((artifact) => artifact.id === activeArtifactId) || null
+  const activeArtifact =
+    artifacts.find((artifact) => artifact.id === activeArtifactId) || null
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const abortRef = useRef<AbortController | null>(null)
   const autoExportedArtifactIdsRef = useRef<Set<string>>(new Set())
@@ -236,11 +301,17 @@ export default function Studio() {
       const s = res.data as AppSettings
       setSettings(s)
       const profiles = s.llm_profiles || []
-      const activeProfiles = profiles.filter((profile) => profile.id === s.active_profile_id)
-      const visibleProfiles = activeProfiles.length > 0 ? activeProfiles : profiles
+      const activeProfiles = profiles.filter(
+        (profile) => profile.id === s.active_profile_id,
+      )
+      const visibleProfiles =
+        activeProfiles.length > 0 ? activeProfiles : profiles
       setModelProfiles(visibleProfiles)
-      const chatModels = Array.from(new Set(visibleProfiles.flatMap((profile) => profile.models || []))).filter((model) => !isMediaOnlyModel(model))
-      if (s.active_model && !isMediaOnlyModel(s.active_model)) setSelectedModel(s.active_model)
+      const chatModels = Array.from(
+        new Set(visibleProfiles.flatMap((profile) => profile.models || [])),
+      ).filter((model) => !isMediaOnlyModel(model))
+      if (s.active_model && !isMediaOnlyModel(s.active_model))
+        setSelectedModel(s.active_model)
       else setSelectedModel(pickChatModel(chatModels, selectedModel))
       if (s.basic?.default_theme) setSelectedTheme(s.basic.default_theme)
     } catch (err) {
@@ -272,7 +343,11 @@ export default function Studio() {
   const refreshConversations = async (query = conversationQuery) => {
     console.log('[refreshConversations] called, query=', query)
     try {
-      const res = await sessionApi.listSessions({ q: query || undefined, page: 1, page_size: 50 })
+      const res = await sessionApi.listSessions({
+        q: query || undefined,
+        page: 1,
+        page_size: 50,
+      })
       console.log('[refreshConversations] response:', res.data)
       const rows = (res.data.sessions || []).map((item: any) => ({
         id: item.id,
@@ -284,7 +359,11 @@ export default function Studio() {
         order_col: item.order_col || 0,
         project_id: item.project_id,
       }))
-      console.log('[refreshConversations] parsed rows:', rows.length, rows.slice(0, 2))
+      console.log(
+        '[refreshConversations] parsed rows:',
+        rows.length,
+        rows.slice(0, 2),
+      )
       setConversations(rows)
     } catch (err) {
       console.error('[refreshConversations] error:', err)
@@ -410,7 +489,11 @@ export default function Studio() {
           // 先尝试通用项目 API
           await projectApi.getProject(session.project_id)
           setActiveProjectId(session.project_id)
-          usePPTStore.setState({ project: null, slides: [], currentSlideIndex: 0 })
+          usePPTStore.setState({
+            project: null,
+            slides: [],
+            currentSlideIndex: 0,
+          })
         } catch {
           // 可能是 PPT 项目 ID（老数据兼容）
           try {
@@ -419,13 +502,23 @@ export default function Studio() {
             setSlides(pptRes.data.slides || [])
             setCurrentSlide(0)
           } catch {
-            usePPTStore.setState({ project: null, slides: [], currentSlideIndex: 0 })
+            usePPTStore.setState({
+              project: null,
+              slides: [],
+              currentSlideIndex: 0,
+            })
           }
         }
       } else {
-        usePPTStore.setState({ project: null, slides: [], currentSlideIndex: 0 })
+        usePPTStore.setState({
+          project: null,
+          slides: [],
+          currentSlideIndex: 0,
+        })
       }
-      setShowArtifactPanel((session.artifacts?.length || 0) > 0 || tool !== 'general')
+      setShowArtifactPanel(
+        (session.artifacts?.length || 0) > 0 || tool !== 'general',
+      )
       setFollowLatestSlide(false)
       setPptProgress(null)
       setStreamPhase('done')
@@ -464,30 +557,53 @@ export default function Studio() {
     }
   }
 
-  const handleMoveConversation = async (id: string, projectId: string | null, beforeId?: string | null) => {
+  const handleMoveConversation = async (
+    id: string,
+    projectId: string | null,
+    beforeId?: string | null,
+  ) => {
     const moving = conversations.find((item) => item.id === id)
     if (!moving) return
 
     const targetItems = conversations
-      .filter((item) => item.id !== id && (item.project_id || null) === projectId)
+      .filter(
+        (item) => item.id !== id && (item.project_id || null) === projectId,
+      )
       .sort((a, b) => (a.order_col || 0) - (b.order_col || 0))
-    const beforeIndex = beforeId ? targetItems.findIndex((item) => item.id === beforeId) : -1
+    const beforeIndex = beforeId
+      ? targetItems.findIndex((item) => item.id === beforeId)
+      : -1
     const insertIndex = beforeIndex >= 0 ? beforeIndex : targetItems.length
-    targetItems.splice(insertIndex, 0, { ...moving, project_id: projectId || undefined })
-    const orderMap = new Map(targetItems.map((item, index) => [item.id, (index + 1) * 1000]))
+    targetItems.splice(insertIndex, 0, {
+      ...moving,
+      project_id: projectId || undefined,
+    })
+    const orderMap = new Map(
+      targetItems.map((item, index) => [item.id, (index + 1) * 1000]),
+    )
 
     const nextConversations = conversations.map((item) => {
-      if (item.id === id) return { ...item, project_id: projectId || undefined, order_col: orderMap.get(item.id) || item.order_col }
-      if (orderMap.has(item.id)) return { ...item, order_col: orderMap.get(item.id) }
+      if (item.id === id)
+        return {
+          ...item,
+          project_id: projectId || undefined,
+          order_col: orderMap.get(item.id) || item.order_col,
+        }
+      if (orderMap.has(item.id))
+        return { ...item, order_col: orderMap.get(item.id) }
       return item
     })
     setConversations(nextConversations)
 
     try {
-      await Promise.all(targetItems.map((item) => sessionApi.updateSession(item.id, {
-        project_id: item.id === id ? projectId : item.project_id || null,
-        order_col: orderMap.get(item.id) || 0,
-      })))
+      await Promise.all(
+        targetItems.map((item) =>
+          sessionApi.updateSession(item.id, {
+            project_id: item.id === id ? projectId : item.project_id || null,
+            order_col: orderMap.get(item.id) || 0,
+          }),
+        ),
+      )
       refreshConversations()
       refreshProjects()
     } catch (err) {
@@ -504,18 +620,28 @@ export default function Studio() {
       const saved = res.data as AppSettings
       setSettings(saved)
       const profiles = saved.llm_profiles || []
-      const activeProfiles = profiles.filter((profile) => profile.id === saved.active_profile_id)
-      const visibleProfiles = activeProfiles.length > 0 ? activeProfiles : profiles
+      const activeProfiles = profiles.filter(
+        (profile) => profile.id === saved.active_profile_id,
+      )
+      const visibleProfiles =
+        activeProfiles.length > 0 ? activeProfiles : profiles
       setModelProfiles(visibleProfiles)
-      const chatModels = Array.from(new Set(visibleProfiles.flatMap((profile) => profile.models || []))).filter((model) => !isMediaOnlyModel(model))
-      if (saved.active_model && !isMediaOnlyModel(saved.active_model)) setSelectedModel(saved.active_model)
+      const chatModels = Array.from(
+        new Set(visibleProfiles.flatMap((profile) => profile.models || [])),
+      ).filter((model) => !isMediaOnlyModel(model))
+      if (saved.active_model && !isMediaOnlyModel(saved.active_model))
+        setSelectedModel(saved.active_model)
       else setSelectedModel(pickChatModel(chatModels, selectedModel))
-      if (saved.basic?.default_theme) setSelectedTheme(saved.basic.default_theme)
+      if (saved.basic?.default_theme)
+        setSelectedTheme(saved.basic.default_theme)
       showToast('设置已保存', 'success')
       setActiveView('chat')
     } catch (err: any) {
       console.error('Save settings error:', err)
-      showToast(err.response?.data?.detail || err.message || '设置保存失败', 'error')
+      showToast(
+        err.response?.data?.detail || err.message || '设置保存失败',
+        'error',
+      )
       throw err
     }
   }
@@ -533,16 +659,20 @@ export default function Studio() {
   const readFileAsText = (file: File) =>
     new Promise<string>((resolve, reject) => {
       const reader = new FileReader()
-      reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : '')
-      reader.onerror = () => reject(reader.error || new Error(`读取文件失败：${file.name}`))
+      reader.onload = () =>
+        resolve(typeof reader.result === 'string' ? reader.result : '')
+      reader.onerror = () =>
+        reject(reader.error || new Error(`读取文件失败：${file.name}`))
       reader.readAsText(file, 'utf-8')
     })
 
   const readFileAsDataUrl = (file: File) =>
     new Promise<string>((resolve, reject) => {
       const reader = new FileReader()
-      reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : '')
-      reader.onerror = () => reject(reader.error || new Error(`读取图片失败：${file.name}`))
+      reader.onload = () =>
+        resolve(typeof reader.result === 'string' ? reader.result : '')
+      reader.onerror = () =>
+        reject(reader.error || new Error(`读取图片失败：${file.name}`))
       reader.readAsDataURL(file)
     })
 
@@ -563,7 +693,11 @@ export default function Studio() {
     }
 
     const image = await loadImageElement(originalDataUrl)
-    const scale = Math.min(1, IMAGE_ATTACHMENT_MAX_EDGE / Math.max(image.naturalWidth || 1, image.naturalHeight || 1))
+    const scale = Math.min(
+      1,
+      IMAGE_ATTACHMENT_MAX_EDGE /
+        Math.max(image.naturalWidth || 1, image.naturalHeight || 1),
+    )
     const width = Math.max(1, Math.round((image.naturalWidth || 1) * scale))
     const height = Math.max(1, Math.round((image.naturalHeight || 1) * scale))
 
@@ -587,11 +721,13 @@ export default function Studio() {
       }
     }
 
-    const preferredMime = file.type === 'image/webp'
-      ? 'image/webp'
-      : file.type === 'image/png' && file.size <= IMAGE_ATTACHMENT_TARGET_BYTES
-        ? 'image/png'
-        : 'image/jpeg'
+    const preferredMime =
+      file.type === 'image/webp'
+        ? 'image/webp'
+        : file.type === 'image/png' &&
+            file.size <= IMAGE_ATTACHMENT_TARGET_BYTES
+          ? 'image/png'
+          : 'image/jpeg'
 
     if (preferredMime === 'image/jpeg') {
       context.fillStyle = '#ffffff'
@@ -599,7 +735,10 @@ export default function Studio() {
     }
     context.drawImage(image, 0, 0, width, height)
 
-    const qualities = preferredMime === 'image/png' ? [undefined] : [0.92, 0.86, 0.8, 0.72, 0.64]
+    const qualities =
+      preferredMime === 'image/png'
+        ? [undefined]
+        : [0.92, 0.86, 0.8, 0.72, 0.64]
     let bestBlob: Blob | null = null
 
     for (const quality of qualities) {
@@ -612,7 +751,8 @@ export default function Studio() {
     }
 
     const finalBlob = bestBlob || file
-    const finalDataUrl = finalBlob === file ? originalDataUrl : await blobToDataUrl(finalBlob)
+    const finalDataUrl =
+      finalBlob === file ? originalDataUrl : await blobToDataUrl(finalBlob)
 
     return {
       id: `${Date.now()}-${crypto.randomUUID()}`,
@@ -628,9 +768,12 @@ export default function Studio() {
     }
   }
 
-  const buildAttachmentFromFile = async (file: File): Promise<ChatAttachment | null> => {
+  const buildAttachmentFromFile = async (
+    file: File,
+  ): Promise<ChatAttachment | null> => {
     const lowerName = file.name.toLowerCase()
-    const isMarkdown = lowerName.endsWith('.md') || file.type === 'text/markdown'
+    const isMarkdown =
+      lowerName.endsWith('.md') || file.type === 'text/markdown'
     const isText = lowerName.endsWith('.txt') || file.type === 'text/plain'
     const isImage = file.type.startsWith('image/')
     const isOfficeText = /\.(docx|xlsx|pptx|pdf|csv|tsv|json)$/i.test(file.name)
@@ -655,7 +798,9 @@ export default function Studio() {
       const res = await fileApi.extract(file)
       const text = String(res.data?.text || '').trim()
       if (!text) return null
-      const parser = res.data?.parser ? `解析器：${res.data.parser}` : '解析器：server'
+      const parser = res.data?.parser
+        ? `解析器：${res.data.parser}`
+        : '解析器：server'
       const truncated = res.data?.truncated ? '（内容较长，已截断）' : ''
       return {
         id: `${Date.now()}-${crypto.randomUUID()}`,
@@ -663,7 +808,11 @@ export default function Studio() {
         kind: 'text',
         mime_type: file.type || 'application/octet-stream',
         size: file.size,
-        text_content: `【附件：${file.name}】${truncated}\n${parser}\n\n${text}`.slice(0, 50000),
+        text_content:
+          `【附件：${file.name}】${truncated}\n${parser}\n\n${text}`.slice(
+            0,
+            50000,
+          ),
       }
     }
 
@@ -675,34 +824,52 @@ export default function Studio() {
     attachmentInputRef.current?.click()
   }
 
-  const handleAttachmentChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleAttachmentChange = async (
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) => {
     const files = Array.from(event.target.files || [])
     event.target.value = ''
 
     if (files.length === 0) return
 
     try {
-      const nextItems = (await Promise.all(files.map(buildAttachmentFromFile))).filter(Boolean) as ChatAttachment[]
+      const nextItems = (
+        await Promise.all(files.map(buildAttachmentFromFile))
+      ).filter(Boolean) as ChatAttachment[]
       const unsupported = files.length - nextItems.length
       if (unsupported > 0) {
-        showToast('目前支持上传 md、txt、csv、json、docx、xlsx、pptx、pdf 和图片文件。', 'error')
+        showToast(
+          '目前支持上传 md、txt、csv、json、docx、xlsx、pptx、pdf 和图片文件。',
+          'error',
+        )
       }
       if (nextItems.length === 0) return
 
       await Promise.allSettled(
         nextItems.map((item) => {
-          const source = files.find((file) => file.name === item.name && file.size === item.size)
+          const source = files.find(
+            (file) => file.name === item.name && file.size === item.size,
+          )
           if (!source) return Promise.resolve()
           return fileApi.upload(source, undefined, '聊天上传附件')
-        })
+        }),
       )
 
       setAttachments((current) => {
         const merged = [...current, ...nextItems]
-        const deduped = merged.filter((item, index, arr) => arr.findIndex((target) => target.name === item.name && target.size === item.size) === index)
+        const deduped = merged.filter(
+          (item, index, arr) =>
+            arr.findIndex(
+              (target) =>
+                target.name === item.name && target.size === item.size,
+            ) === index,
+        )
         return deduped.slice(0, 6)
       })
-      showToast(`已添加 ${nextItems.length} 个附件，并保存到我的文件`, 'success')
+      showToast(
+        `已添加 ${nextItems.length} 个附件，并保存到我的文件`,
+        'success',
+      )
     } catch (err) {
       console.error('Read attachment error:', err)
       showToast('读取附件失败，请检查文件编码或重新选择文件。', 'error')
@@ -725,9 +892,12 @@ export default function Studio() {
   }) => {
     const currentProject = usePPTStore.getState().project
     const currentSlides = usePPTStore.getState().slides
-    const nextSlides = Array.isArray(payload.slides) ? payload.slides : currentProject?.slides || []
+    const nextSlides = Array.isArray(payload.slides)
+      ? payload.slides
+      : currentProject?.slides || []
     const nextTheme = payload.theme || currentProject?.theme || selectedTheme
-    const nextProjectId = payload.project_id || currentProject?.id || `ppt-${Date.now()}`
+    const nextProjectId =
+      payload.project_id || currentProject?.id || `ppt-${Date.now()}`
 
     if (payload.project_id) {
       setActiveProjectId(payload.project_id)
@@ -752,11 +922,19 @@ export default function Studio() {
     } else if (followLatestSlide && nextSlides.length >= currentSlides.length) {
       setCurrentSlide(nextSlides.length - 1)
     } else {
-      setCurrentSlide(Math.min(usePPTStore.getState().currentSlideIndex, nextSlides.length - 1))
+      setCurrentSlide(
+        Math.min(
+          usePPTStore.getState().currentSlideIndex,
+          nextSlides.length - 1,
+        ),
+      )
     }
     if (typeof payload.total_slides === 'number') {
       setPptProgress({
-        current: typeof payload.slide_count === 'number' ? payload.slide_count : nextSlides.length,
+        current:
+          typeof payload.slide_count === 'number'
+            ? payload.slide_count
+            : nextSlides.length,
         total: payload.total_slides,
       })
     }
@@ -770,30 +948,72 @@ export default function Studio() {
       slides: artifact.content?.slides,
       history: artifact.content?.history,
     })
-    if (Array.isArray(artifact.content?.slides) && artifact.content.slides.length > 0) {
+    if (
+      Array.isArray(artifact.content?.slides) &&
+      artifact.content.slides.length > 0
+    ) {
       setCurrentSlide(0)
     }
   }
 
-  const inferToolFromMessage = (text: string, pendingAttachments: ChatAttachment[] = []): ToolKind => {
+  const inferToolFromMessage = (
+    text: string,
+    pendingAttachments: ChatAttachment[] = [],
+  ): ToolKind => {
     const lower = text.toLowerCase()
     const hits: ToolKind[] = []
-    const hasImageAttachment = pendingAttachments.some((item) => item.kind === 'image')
-    const hasImageRecognitionIntent = /这是什么|识别|识图|看图|帮我看看|图里|图片里|截图里|读图|ocr|提取文字|解析图片|说明图片|分析图片|描述图片/.test(lower)
-    const hasImageGenerationIntent = /生成.*图|做.*图|画.*图|出图|图生图|以图生图|基于.*图.*图|参考.*图.*图|基于图片|基于这张图|基于这个图|基于照片|参考图片|参考这张图|用这张图|按照这张图|改图|修图|重绘|换风格|换背景|换衣服|换装|变装|换发型|去除背景|抠图|扩图|其他穿着|穿着|衣服|服装|造型|换成|改成|海报|封面|logo|配图|主视觉|插画|banner|视觉稿|图象创作|图像创作/.test(lower)
-    const hasVideoGenerationIntent = /生成.*视频|做.*视频|制作.*视频|图生视频|以图生视频|基于.*图.*视频|参考.*图.*视频|让.*图.*动|让.*照片.*动|动起来|动态化|短片|短视频|宣传片|动画|视频广告|片头|转场|动态海报|mv|motion/.test(lower)
+    const hasImageAttachment = pendingAttachments.some(
+      (item) => item.kind === 'image',
+    )
+    const hasImageRecognitionIntent =
+      /这是什么|识别|识图|看图|帮我看看|图里|图片里|截图里|读图|ocr|提取文字|解析图片|说明图片|分析图片|描述图片/.test(
+        lower,
+      )
+    const hasImageGenerationIntent =
+      /生成.*图|做.*图|画.*图|出图|图生图|以图生图|基于.*图.*图|参考.*图.*图|基于图片|基于这张图|基于这个图|基于照片|参考图片|参考这张图|用这张图|按照这张图|改图|修图|重绘|换风格|换背景|换衣服|换装|变装|换发型|去除背景|抠图|扩图|其他穿着|穿着|衣服|服装|造型|换成|改成|海报|封面|logo|配图|主视觉|插画|banner|视觉稿|图象创作|图像创作/.test(
+        lower,
+      )
+    const hasVideoGenerationIntent =
+      /生成.*视频|做.*视频|制作.*视频|图生视频|以图生视频|基于.*图.*视频|参考.*图.*视频|让.*图.*动|让.*照片.*动|动起来|动态化|短片|短视频|宣传片|动画|视频广告|片头|转场|动态海报|mv|motion/.test(
+        lower,
+      )
 
-    if (/draw\.io|drawio|流程图|架构图|泳道图|拓扑图|er图/.test(lower)) hits.push('drawio')
+    if (/draw\.io|drawio|流程图|架构图|泳道图|拓扑图|er图/.test(lower))
+      hits.push('drawio')
     if (/excel|xlsx|表格|数据分析|公式|在线表/.test(lower)) hits.push('excel')
-    if (/文档|报告|prd|方案|纪要|文章|docx|markdown|readme|知识库|说明文档|操作手册|md\b/.test(lower)) hits.push('doc')
-    if (/ppt|演示文稿|幻灯片|presentation|做个.*汇报|生成.*汇报|制作.*汇报|汇报材料/.test(lower)) hits.push('ppt')
-    if (hasImageGenerationIntent || (/图片|图象|图像/.test(lower) && !hasImageRecognitionIntent && !hasImageAttachment)) hits.push('image')
+    if (
+      /文档|报告|prd|方案|纪要|文章|docx|markdown|readme|知识库|说明文档|操作手册|md\b/.test(
+        lower,
+      )
+    )
+      hits.push('doc')
+    if (
+      /ppt|演示文稿|幻灯片|presentation|做个.*汇报|生成.*汇报|制作.*汇报|汇报材料/.test(
+        lower,
+      )
+    )
+      hits.push('ppt')
+    if (
+      hasImageGenerationIntent ||
+      (/图片|图象|图像/.test(lower) &&
+        !hasImageRecognitionIntent &&
+        !hasImageAttachment)
+    )
+      hits.push('image')
     if (hasVideoGenerationIntent || /视频|video/.test(lower)) hits.push('video')
-    const wantsMultiple = /同时|一起|并且|再来|外加|附上|配一张|再补一个|多个|一套/.test(lower)
+    const wantsMultiple =
+      /同时|一起|并且|再来|外加|附上|配一张|再补一个|多个|一套/.test(lower)
     const uniqueHits = Array.from(new Set(hits))
-    if (uniqueHits.includes('video') && uniqueHits.includes('image') && hasVideoGenerationIntent && !wantsMultiple) return 'video'
+    if (
+      uniqueHits.includes('video') &&
+      uniqueHits.includes('image') &&
+      hasVideoGenerationIntent &&
+      !wantsMultiple
+    )
+      return 'video'
     if (hasImageAttachment && !hasImageGenerationIntent) return 'general'
-    if (uniqueHits.length > 1 || (wantsMultiple && uniqueHits.length > 0)) return 'general'
+    if (uniqueHits.length > 1 || (wantsMultiple && uniqueHits.length > 0))
+      return 'general'
     if (uniqueHits.length === 1) return uniqueHits[0]
     return activeTool
   }
@@ -802,7 +1022,11 @@ export default function Studio() {
     if ((!input.trim() && attachments.length === 0) || isStreaming) return
 
     const hasImageAttachment = attachments.some((item) => item.kind === 'image')
-    const message = input.trim() || (hasImageAttachment ? '请识别并说明我上传图片的主要内容。' : '请结合我上传的文件内容继续处理。')
+    const message =
+      input.trim() ||
+      (hasImageAttachment
+        ? '请识别并说明我上传图片的主要内容。'
+        : '请结合我上传的文件内容继续处理。')
     const pendingAttachments = attachments
     const inferredTool = inferToolFromMessage(message, pendingAttachments)
     if (inferredTool !== activeTool) setActiveTool(inferredTool)
@@ -812,11 +1036,17 @@ export default function Studio() {
     setFollowLatestSlide(true)
     setPptProgress(null)
     setStreamPhase('thinking')
-    setStreamStatus(pendingAttachments.length > 0 ? '正在整理消息与附件...' : '正在理解需求...')
+    setStreamStatus(
+      pendingAttachments.length > 0
+        ? '正在整理消息与附件...'
+        : '正在理解需求...',
+    )
     setProcessLogs([
       '开始处理请求',
       `识别工具：${inferredTool}`,
-      ...(pendingAttachments.length > 0 ? [`附件：已接收 ${pendingAttachments.length} 个文件`] : []),
+      ...(pendingAttachments.length > 0
+        ? [`附件：已接收 ${pendingAttachments.length} 个文件`]
+        : []),
     ])
     const abortController = new AbortController()
     abortRef.current = abortController
@@ -863,7 +1093,9 @@ export default function Studio() {
           switch (event) {
             case 'message':
               setStreamPhase(data.start ? 'thinking' : 'finishing')
-              setStreamStatus(data.start ? '正在连接模型...' : '正在整理回复...')
+              setStreamStatus(
+                data.start ? '正在连接模型...' : '正在整理回复...',
+              )
               if (data.text) {
                 assistantText += data.text
                 usePPTStore.setState((state) => {
@@ -899,7 +1131,7 @@ export default function Studio() {
               setStreamStatus(
                 typeof data.total_slides === 'number'
                   ? `已创建项目，准备生成 1 / ${data.total_slides} 页...`
-                  : '已创建项目，正在生成大纲...'
+                  : '已创建项目，正在生成大纲...',
               )
               applyRealtimePptState(data)
               if (data.theme) setSelectedTheme(data.theme)
@@ -910,9 +1142,10 @@ export default function Studio() {
               setShowArtifactPanel(true)
               setStreamPhase('generating')
               setStreamStatus(
-                typeof data.slide_count === 'number' && typeof data.total_slides === 'number'
+                typeof data.slide_count === 'number' &&
+                  typeof data.total_slides === 'number'
                   ? `正在生成第 ${data.slide_count} / ${data.total_slides} 页...`
-                  : `正在更新幻灯片${data.slide_count ? `（${data.slide_count} 页）` : ''}...`
+                  : `正在更新幻灯片${data.slide_count ? `（${data.slide_count} 页）` : ''}...`,
               )
               if (data.slides) {
                 applyRealtimePptState(data)
@@ -922,15 +1155,26 @@ export default function Studio() {
             case 'artifact_update':
               if (data.artifact) {
                 upsertArtifact(data.artifact)
-                setActiveTool(inferredTool === 'general' ? 'general' : (data.artifact.tool_kind || inferredTool))
+                setActiveTool(
+                  inferredTool === 'general'
+                    ? 'general'
+                    : data.artifact.tool_kind || inferredTool,
+                )
                 setShowArtifactPanel(true)
-                setStreamPhase(data.artifact.status === 'ready' ? 'finishing' : 'generating')
-                setStreamStatus(`已更新产物：${data.artifact.title || '未命名产物'}`)
+                setStreamPhase(
+                  data.artifact.status === 'ready' ? 'finishing' : 'generating',
+                )
+                setStreamStatus(
+                  `已更新产物：${data.artifact.title || '未命名产物'}`,
+                )
                 if (data.artifact.kind === 'ppt') {
                   applyPptArtifact(data.artifact)
                   if (typeof data.artifact.content?.total_slides === 'number') {
                     setPptProgress({
-                      current: data.artifact.content?.slide_count || data.artifact.content?.slides?.length || 0,
+                      current:
+                        data.artifact.content?.slide_count ||
+                        data.artifact.content?.slides?.length ||
+                        0,
                       total: data.artifact.content.total_slides,
                     })
                   }
@@ -941,10 +1185,16 @@ export default function Studio() {
                   !autoExportedArtifactIdsRef.current.has(data.artifact.id)
                 ) {
                   autoExportedArtifactIdsRef.current.add(data.artifact.id)
-                  setProcessLogs((logs) => [...logs.slice(-8), 'Excel：正在自动导出 XLSX'])
+                  setProcessLogs((logs) => [
+                    ...logs.slice(-8),
+                    'Excel：正在自动导出 XLSX',
+                  ])
                   handleExportExcel(data.artifact).catch((err) => {
                     console.error('Auto Excel export error:', err)
-                    setProcessLogs((logs) => [...logs.slice(-8), 'Excel：自动导出失败，请点击右侧按钮重试'])
+                    setProcessLogs((logs) => [
+                      ...logs.slice(-8),
+                      'Excel：自动导出失败，请点击右侧按钮重试',
+                    ])
                   })
                 }
                 if (
@@ -953,10 +1203,16 @@ export default function Studio() {
                   !autoExportedArtifactIdsRef.current.has(data.artifact.id)
                 ) {
                   autoExportedArtifactIdsRef.current.add(data.artifact.id)
-                  setProcessLogs((logs) => [...logs.slice(-8), 'Word：正在自动导出 DOCX'])
+                  setProcessLogs((logs) => [
+                    ...logs.slice(-8),
+                    'Word：正在自动导出 DOCX',
+                  ])
                   handleExportDocx(data.artifact).catch((err) => {
                     console.error('Auto DOCX export error:', err)
-                    setProcessLogs((logs) => [...logs.slice(-8), 'Word：自动导出失败，请点击右侧按钮重试'])
+                    setProcessLogs((logs) => [
+                      ...logs.slice(-8),
+                      'Word：自动导出失败，请点击右侧按钮重试',
+                    ])
                   })
                 }
                 if (
@@ -965,11 +1221,19 @@ export default function Studio() {
                   !autoExportedArtifactIdsRef.current.has(data.artifact.id)
                 ) {
                   autoExportedArtifactIdsRef.current.add(data.artifact.id)
-                  setProcessLogs((logs) => [...logs.slice(-8), 'Markdown：正在自动下载 MD'])
-                  Promise.resolve(handleExportMarkdown(data.artifact)).catch((err) => {
-                    console.error('Auto Markdown export error:', err)
-                    setProcessLogs((logs) => [...logs.slice(-8), 'Markdown：自动下载失败，请点击右侧按钮重试'])
-                  })
+                  setProcessLogs((logs) => [
+                    ...logs.slice(-8),
+                    'Markdown：正在自动下载 MD',
+                  ])
+                  Promise.resolve(handleExportMarkdown(data.artifact)).catch(
+                    (err) => {
+                      console.error('Auto Markdown export error:', err)
+                      setProcessLogs((logs) => [
+                        ...logs.slice(-8),
+                        'Markdown：自动下载失败，请点击右侧按钮重试',
+                      ])
+                    },
+                  )
                 }
               }
               break
@@ -977,41 +1241,68 @@ export default function Studio() {
             case 'state_update':
               setStreamPhase(data.phase === 'done' ? 'done' : 'generating')
               setStreamStatus(data.detail || data.step || '正在处理...')
-              setProcessLogs((logs) => [...logs.slice(-8), `${data.step || '进度'}：${data.detail || ''}`])
+              setProcessLogs((logs) => [
+                ...logs.slice(-8),
+                `${data.step || '进度'}：${data.detail || ''}`,
+              ])
               break
 
             case 'tool_result': {
               const toolName = data.tool || 'unknown'
-              const detail = data.error || data.result?.error || data.result?.observation || ''
+              const detail =
+                data.error ||
+                data.result?.error ||
+                data.result?.observation ||
+                ''
               if (data.success) {
-                setProcessLogs((logs) => [...logs.slice(-8), `工具 ${toolName} ✓ 完成`])
+                setProcessLogs((logs) => [
+                  ...logs.slice(-8),
+                  `工具 ${toolName} ✓ 完成`,
+                ])
               } else {
-                const message = detail ? String(detail).slice(0, 300) : '未返回具体错误'
+                const message = detail
+                  ? String(detail).slice(0, 300)
+                  : '未返回具体错误'
                 setStreamStatus(`工具 ${toolName} 失败：${message}`)
-                setProcessLogs((logs) => [...logs.slice(-8), `工具 ${toolName} ✗ 失败：${message}`])
+                setProcessLogs((logs) => [
+                  ...logs.slice(-8),
+                  `工具 ${toolName} ✗ 失败：${message}`,
+                ])
               }
               break
             }
 
             case 'done': {
               playConversationDoneSound()
-              const doneArtifacts = Array.isArray(data.new_artifacts) ? data.new_artifacts : []
+              const doneArtifacts = Array.isArray(data.new_artifacts)
+                ? data.new_artifacts
+                : []
               setStreamPhase('done')
-              setStreamStatus(doneArtifacts.length > 0 ? '生成完成' : '回复完成')
+              setStreamStatus(
+                doneArtifacts.length > 0 ? '生成完成' : '回复完成',
+              )
               if (data.session_id) setSessionId(data.session_id)
               // 确保对话结束后立即刷新列表，让当前对话出现在侧边栏
               refreshConversations()
               refreshProjects()
               if (Array.isArray(data.artifacts)) {
-                data.artifacts.forEach((artifact: Artifact) => upsertArtifact(artifact))
+                data.artifacts.forEach((artifact: Artifact) =>
+                  upsertArtifact(artifact),
+                )
                 if (data.artifacts.length > 0) {
                   setShowArtifactPanel(true)
                 }
               }
-              const pptArtifact = doneArtifacts.find((item: Artifact) => item.kind === 'ppt')
+              const pptArtifact = doneArtifacts.find(
+                (item: Artifact) => item.kind === 'ppt',
+              )
               if (pptArtifact) {
                 applyPptArtifact(pptArtifact)
-                const total = pptArtifact.content?.total_slides || pptArtifact.content?.slide_count || pptArtifact.content?.slides?.length || 0
+                const total =
+                  pptArtifact.content?.total_slides ||
+                  pptArtifact.content?.slide_count ||
+                  pptArtifact.content?.slides?.length ||
+                  0
                 if (total > 0) {
                   setPptProgress({ current: total, total })
                 }
@@ -1042,7 +1333,7 @@ export default function Studio() {
         },
         token,
         abortController.signal,
-        toolConfig
+        toolConfig,
       )
     } catch (err) {
       console.error('Chat error:', err)
@@ -1061,8 +1352,8 @@ export default function Studio() {
           content: aborted
             ? '已停止本次生成。'
             : errorMessage === '未认证'
-            ? '登录状态已失效，请重新登录后再试。'
-            : `抱歉，发生了错误：${errorMessage}`,
+              ? '登录状态已失效，请重新登录后再试。'
+              : `抱歉，发生了错误：${errorMessage}`,
         }
         return { messages: msgs }
       })
@@ -1082,8 +1373,10 @@ export default function Studio() {
     setPptProgress(null)
   }
 
-
-  const handleExport = async (projectId = project?.id, projectTitle = project?.title) => {
+  const handleExport = async (
+    projectId = project?.id,
+    projectTitle = project?.title,
+  ) => {
     if (!projectId) return
     try {
       const res = await pptApi.exportPptx(projectId)
@@ -1115,17 +1408,30 @@ export default function Studio() {
     window.URL.revokeObjectURL(url)
   }
 
-  const safeFilename = (title: string | undefined, fallback: string, extension: string) => {
-    const base = (title || fallback).replace(/[\\/:*?"<>|]/g, '_').trim() || fallback
-    return base.toLowerCase().endsWith(extension.toLowerCase()) ? base : `${base}${extension}`
+  const safeFilename = (
+    title: string | undefined,
+    fallback: string,
+    extension: string,
+  ) => {
+    const base =
+      (title || fallback).replace(/[\\/:*?"<>|]/g, '_').trim() || fallback
+    return base.toLowerCase().endsWith(extension.toLowerCase())
+      ? base
+      : `${base}${extension}`
   }
 
-  const saveGeneratedBlob = async (blob: Blob, filename: string, artifact?: Artifact) => {
+  const saveGeneratedBlob = async (
+    blob: Blob,
+    filename: string,
+    artifact?: Artifact,
+  ) => {
     try {
       await fileApi.saveBlob(
         blob,
         filename,
-        artifact ? `智能助手生成：${artifact.title || filename}` : '智能助手生成'
+        artifact
+          ? `智能助手生成：${artifact.title || filename}`
+          : '智能助手生成',
       )
       if (artifact?.id) autoSavedArtifactIdsRef.current.add(artifact.id)
     } catch (err) {
@@ -1150,7 +1456,8 @@ export default function Studio() {
       const url = window.URL.createObjectURL(blob)
       const link = document.createElement('a')
       const filename = safeFilename(artifact.title, 'spreadsheet', '.xlsx')
-      if (!autoSavedArtifactIdsRef.current.has(artifact.id)) await saveGeneratedBlob(blob, filename, artifact)
+      if (!autoSavedArtifactIdsRef.current.has(artifact.id))
+        await saveGeneratedBlob(blob, filename, artifact)
       link.href = url
       link.download = filename
       document.body.appendChild(link)
@@ -1170,7 +1477,8 @@ export default function Studio() {
       const url = window.URL.createObjectURL(blob)
       const link = document.createElement('a')
       const filename = safeFilename(artifact.title, 'document', '.docx')
-      if (!autoSavedArtifactIdsRef.current.has(artifact.id)) await saveGeneratedBlob(blob, filename, artifact)
+      if (!autoSavedArtifactIdsRef.current.has(artifact.id))
+        await saveGeneratedBlob(blob, filename, artifact)
       link.href = url
       link.download = filename
       document.body.appendChild(link)
@@ -1192,7 +1500,8 @@ export default function Studio() {
       }
       const blob = new Blob([markdown], { type: 'text/markdown;charset=utf-8' })
       const filename = safeFilename(artifact.title, 'document', '.md')
-      if (!autoSavedArtifactIdsRef.current.has(artifact.id)) void saveGeneratedBlob(blob, filename, artifact)
+      if (!autoSavedArtifactIdsRef.current.has(artifact.id))
+        void saveGeneratedBlob(blob, filename, artifact)
       downloadBlob(blob, filename)
     } catch (err) {
       console.error('Markdown export error:', err)
@@ -1215,7 +1524,8 @@ export default function Studio() {
       }
       const blob = new Blob([xml], { type: 'application/xml;charset=utf-8' })
       const filename = safeFilename(artifact.title, 'diagram', '.drawio')
-      if (!autoSavedArtifactIdsRef.current.has(artifact.id)) await saveGeneratedBlob(blob, filename, artifact)
+      if (!autoSavedArtifactIdsRef.current.has(artifact.id))
+        await saveGeneratedBlob(blob, filename, artifact)
       downloadBlob(blob, filename)
     } catch (err) {
       console.error('Draw.io export error:', err)
@@ -1237,7 +1547,10 @@ export default function Studio() {
       return
     }
     if (artifact.kind === 'ppt') {
-      if (artifact.content?.project_id && (!project || project.id !== artifact.content.project_id)) {
+      if (
+        artifact.content?.project_id &&
+        (!project || project.id !== artifact.content.project_id)
+      ) {
         try {
           const pptRes = await pptApi.getProject(artifact.content.project_id)
           setProject(pptRes.data)
@@ -1246,7 +1559,10 @@ export default function Studio() {
           console.error('Load PPT project before export error:', err)
         }
       }
-      await handleExport(artifact.content?.project_id || project?.id, artifact.title || project?.title)
+      await handleExport(
+        artifact.content?.project_id || project?.id,
+        artifact.title || project?.title,
+      )
       return
     }
     if (artifact.kind === 'drawio') {
@@ -1296,7 +1612,8 @@ export default function Studio() {
     }
   }
 
-  const hasRenderableArtifact = slides.length > 0 || artifacts.length > 0 || !!activeArtifact
+  const hasRenderableArtifact =
+    slides.length > 0 || artifacts.length > 0 || !!activeArtifact
 
   // 构建传给 ChatPanel 的项目列表（用于下拉选择）
   const pptProjects = projects.map((p) => ({
@@ -1314,7 +1631,9 @@ export default function Studio() {
     navigate('/login')
   }
 
-  const handleSidebarResizeStart = (event: React.PointerEvent<HTMLDivElement>) => {
+  const handleSidebarResizeStart = (
+    event: React.PointerEvent<HTMLDivElement>,
+  ) => {
     event.preventDefault()
     const startX = event.clientX
     const startWidth = sidebarWidth
@@ -1324,7 +1643,10 @@ export default function Studio() {
     let latestWidth = startWidth
 
     const handlePointerMove = (moveEvent: PointerEvent) => {
-      latestWidth = Math.min(SIDEBAR_MAX_WIDTH, Math.max(SIDEBAR_MIN_WIDTH, startWidth + moveEvent.clientX - startX))
+      latestWidth = Math.min(
+        SIDEBAR_MAX_WIDTH,
+        Math.max(SIDEBAR_MIN_WIDTH, startWidth + moveEvent.clientX - startX),
+      )
       setSidebarWidth(latestWidth)
     }
 
@@ -1333,7 +1655,10 @@ export default function Studio() {
       document.body.style.userSelect = ''
       window.removeEventListener('pointermove', handlePointerMove)
       window.removeEventListener('pointerup', handlePointerUp)
-      window.localStorage.setItem(SIDEBAR_WIDTH_STORAGE_KEY, String(latestWidth))
+      window.localStorage.setItem(
+        SIDEBAR_WIDTH_STORAGE_KEY,
+        String(latestWidth),
+      )
     }
 
     window.addEventListener('pointermove', handlePointerMove)
@@ -1374,15 +1699,24 @@ export default function Studio() {
           <header className="workspace-panel relative z-20 flex h-14 shrink-0 items-center justify-between rounded-none border-x-0 border-t-0 border-black/[0.05] bg-[#f6f4ef]/78 px-5">
             <div className="flex min-w-0 items-center gap-3">
               <div className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-2xl bg-white/70 shadow-sm ring-1 ring-black/[0.04]">
-                <img src={LOGO_URL} alt="revueOffice logo" className="h-full w-full object-cover" />
+                <img
+                  src={LOGO_URL}
+                  alt="revueOffice logo"
+                  className="h-full w-full object-cover"
+                />
               </div>
               <div className="min-w-0">
                 <div className="truncate text-sm font-semibold tracking-tight text-surface-950">
                   {settings?.basic?.workspace_title || '智能办公助手'}
                 </div>
                 <div className="truncate text-[11px] text-surface-500">
-                  {settings?.basic?.brand_tagline || '分析 · 决策 · 绘制 · 流式反馈'}
-                  {project ? ` · ${project.title}` : activeProjectId ? ` · ${projects.find(p => p.id === activeProjectId)?.title || ''}` : ''}
+                  {settings?.basic?.brand_tagline ||
+                    '分析 · 决策 · 绘制 · 流式反馈'}
+                  {project
+                    ? ` · ${project.title}`
+                    : activeProjectId
+                      ? ` · ${projects.find((p) => p.id === activeProjectId)?.title || ''}`
+                      : ''}
                 </div>
               </div>
             </div>
@@ -1393,10 +1727,16 @@ export default function Studio() {
               <button
                 onClick={() => setShowArtifactPanel(!showArtifactPanel)}
                 className="btn-ghost rounded-full bg-white/45 hover:bg-white/75 disabled:cursor-not-allowed disabled:opacity-40"
-                title={hasRenderableArtifact ? '切换右侧成果展示' : '暂无成果可展示'}
+                title={
+                  hasRenderableArtifact ? '切换右侧成果展示' : '暂无成果可展示'
+                }
                 disabled={!hasRenderableArtifact}
               >
-                {showArtifactPanel ? <PanelRightClose className="w-4 h-4" /> : <PanelRight className="w-4 h-4" />}
+                {showArtifactPanel ? (
+                  <PanelRightClose className="w-4 h-4" />
+                ) : (
+                  <PanelRight className="w-4 h-4" />
+                )}
               </button>
               <button
                 onClick={() => setShowPresent(true)}
@@ -1437,7 +1777,9 @@ export default function Studio() {
                 artifacts={artifacts}
                 activeArtifactId={activeArtifactId}
                 toolConfig={toolConfig}
-                onProjectChange={(pid) => pid ? handleSelectProject(pid) : setActiveProjectId(null)}
+                onProjectChange={(pid) =>
+                  pid ? handleSelectProject(pid) : setActiveProjectId(null)
+                }
                 onNewProject={handleNewProject}
                 onModelChange={handleModelChange}
                 onToolChange={handleToolChange}
@@ -1493,22 +1835,27 @@ export default function Studio() {
         />
       )}
       {toast && (
-        <div className="pointer-events-none fixed right-5 top-5 z-[70] flex justify-end" aria-live="polite">
-          <div className={`pointer-events-auto flex max-w-sm items-start gap-3 rounded-3xl border px-4 py-3 shadow-[0_18px_55px_rgba(24,24,27,0.16)] backdrop-blur-2xl ${
-            toast.tone === 'error'
-              ? 'border-red-200 bg-red-50/95 text-red-700'
-              : toast.tone === 'success'
-                ? 'border-emerald-200 bg-emerald-50/95 text-emerald-700'
-                : 'border-black/[0.06] bg-white/92 text-surface-700'
-          }`}
-          >
-            <div className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-2xl ${
+        <div
+          className="pointer-events-none fixed right-5 top-5 z-[70] flex justify-end"
+          aria-live="polite"
+        >
+          <div
+            className={`pointer-events-auto flex max-w-sm items-start gap-3 rounded-3xl border px-4 py-3 shadow-[0_18px_55px_rgba(24,24,27,0.16)] backdrop-blur-2xl ${
               toast.tone === 'error'
-                ? 'bg-red-100 text-red-600'
+                ? 'border-red-200 bg-red-50/95 text-red-700'
                 : toast.tone === 'success'
-                  ? 'bg-emerald-100 text-emerald-600'
-                  : 'bg-surface-100 text-surface-600'
+                  ? 'border-emerald-200 bg-emerald-50/95 text-emerald-700'
+                  : 'border-black/[0.06] bg-white/92 text-surface-700'
             }`}
+          >
+            <div
+              className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-2xl ${
+                toast.tone === 'error'
+                  ? 'bg-red-100 text-red-600'
+                  : toast.tone === 'success'
+                    ? 'bg-emerald-100 text-emerald-600'
+                    : 'bg-surface-100 text-surface-600'
+              }`}
             >
               {toast.tone === 'error' ? (
                 <AlertCircle className="h-4 w-4" />
@@ -1518,7 +1865,9 @@ export default function Studio() {
                 <Info className="h-4 w-4" />
               )}
             </div>
-            <div className="min-w-0 flex-1 pt-1 text-sm font-semibold leading-5">{toast.message}</div>
+            <div className="min-w-0 flex-1 pt-1 text-sm font-semibold leading-5">
+              {toast.message}
+            </div>
             <button
               type="button"
               onClick={() => setToast(null)}
@@ -1556,7 +1905,8 @@ function PresentMode({
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose()
-      if (e.key === 'ArrowRight' || e.key === ' ') setIndex((i) => Math.min(i + 1, slides.length - 1))
+      if (e.key === 'ArrowRight' || e.key === ' ')
+        setIndex((i) => Math.min(i + 1, slides.length - 1))
       if (e.key === 'ArrowLeft') setIndex((i) => Math.max(i - 1, 0))
     }
     window.addEventListener('keydown', handleKey)

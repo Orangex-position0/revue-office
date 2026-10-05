@@ -43,7 +43,9 @@ anyhow = "1"
 thiserror = "1"
 
 # Database
-sqlx = { version = "0.8", features = ["runtime-tokio", "sqlite", "mysql", "any", "chrono", "uuid", "json"] }
+# Keep mysql-rsa disabled: non-TLS RSA authentication pulls in RUSTSEC-2023-0071.
+# MySQL servers requiring full password authentication should use TLS.
+sqlx = { version = "0.9", features = ["runtime-tokio", "tls-rustls-ring-native-roots", "sqlite", "mysql", "any", "chrono", "uuid", "json"] }
 
 # Auth
 jsonwebtoken = "9"

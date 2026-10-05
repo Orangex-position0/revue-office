@@ -1,4 +1,10 @@
-import { ChevronLeft, ChevronRight, ZoomIn, ZoomOut, Maximize2 } from 'lucide-react'
+import {
+  ChevronLeft,
+  ChevronRight,
+  ZoomIn,
+  ZoomOut,
+  Maximize2,
+} from 'lucide-react'
 import { useState } from 'react'
 import { usePPTStore } from '@/stores/ppt-store'
 
@@ -22,7 +28,9 @@ export function Toolbar() {
           <ChevronLeft className="w-4 h-4" />
         </button>
         <span className="text-sm text-surface-500 px-2">
-          {slides.length > 0 ? `${currentSlideIndex + 1} / ${slides.length}` : '0 / 0'}
+          {slides.length > 0
+            ? `${currentSlideIndex + 1} / ${slides.length}`
+            : '0 / 0'}
         </span>
         <button
           onClick={() => canNext && setCurrentSlide(currentSlideIndex + 1)}

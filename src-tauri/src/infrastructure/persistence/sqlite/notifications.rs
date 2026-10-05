@@ -57,7 +57,8 @@ impl NotificationRepository for SqliteNotificationRepository {
                 "SELECT {COLUMNS} FROM notifications WHERE user_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?"
             )
         };
-        sqlx::query(&sql)
+        let mut sql = sqlx::QueryBuilder::<sqlx::Sqlite>::new(sql);
+        sql.build()
             .bind(&query.owner_id.0)
             .bind(query.limit())
             .bind(query.offset())

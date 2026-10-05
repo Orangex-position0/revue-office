@@ -25,7 +25,10 @@ function formatTurnTime(value?: string | null) {
   }).format(new Date(time))
 }
 
-export function groupArtifactsByTurn(artifacts: Artifact[], messages: ChatMessage[]): ArtifactTurnGroup[] {
+export function groupArtifactsByTurn(
+  artifacts: Artifact[],
+  messages: ChatMessage[],
+): ArtifactTurnGroup[] {
   if (artifacts.length === 0) return []
 
   const userTurns = messages
@@ -37,13 +40,15 @@ export function groupArtifactsByTurn(artifacts: Artifact[], messages: ChatMessag
     }))
 
   if (userTurns.length === 0) {
-    return [{
-      key: 'turn-1',
-      turnNumber: 1,
-      title: '第 1 轮',
-      timeLabel: formatTurnTime(artifacts[0]?.created_at),
-      artifacts,
-    }]
+    return [
+      {
+        key: 'turn-1',
+        turnNumber: 1,
+        title: '第 1 轮',
+        timeLabel: formatTurnTime(artifacts[0]?.created_at),
+        artifacts,
+      },
+    ]
   }
 
   const buckets = new Map<number, Artifact[]>()
@@ -78,13 +83,22 @@ export function groupArtifactsByTurn(artifacts: Artifact[], messages: ChatMessag
         key: `turn-${turnNumber}`,
         turnNumber,
         title: `第 ${turnNumber} 轮`,
-        timeLabel: formatTurnTime(turn?.timestamp || turnArtifacts[0]?.created_at),
+        timeLabel: formatTurnTime(
+          turn?.timestamp || turnArtifacts[0]?.created_at,
+        ),
         artifacts: turnArtifacts,
       }
     })
 }
 
-export function findArtifactTurnGroup(artifactId: string | null, groups: ArtifactTurnGroup[]) {
+export function findArtifactTurnGroup(
+  artifactId: string | null,
+  groups: ArtifactTurnGroup[],
+) {
   if (!artifactId) return null
-  return groups.find((group) => group.artifacts.some((artifact) => artifact.id === artifactId)) || null
+  return (
+    groups.find((group) =>
+      group.artifacts.some((artifact) => artifact.id === artifactId),
+    ) || null
+  )
 }

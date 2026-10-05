@@ -1,7 +1,12 @@
 import { useState, useEffect } from 'react'
 import {
-  FileText, Image, FileSpreadsheet, FileType, FileCode,
-  File as FileIcon, Play,
+  FileText,
+  Image,
+  FileSpreadsheet,
+  FileType,
+  FileCode,
+  File as FileIcon,
+  Play,
 } from 'lucide-react'
 import { fileApi } from '@/api'
 import type { FileItem } from '@/types'
@@ -44,7 +49,8 @@ export function FileThumbnail({ file, size = 'md' }: FileThumbnailProps) {
   const Icon = FILE_ICONS[file.file_type] || FileIcon
   const colorClass = FILE_COLORS[file.file_type] || FILE_COLORS.other
 
-  const iconSize = size === 'sm' ? 'h-6 w-6' : size === 'lg' ? 'h-10 w-10' : 'h-8 w-8'
+  const iconSize =
+    size === 'sm' ? 'h-6 w-6' : size === 'lg' ? 'h-10 w-10' : 'h-8 w-8'
   const containerSize = size === 'sm' ? 'h-20' : size === 'lg' ? 'h-40' : 'h-28'
 
   useEffect(() => {
@@ -54,8 +60,9 @@ export function FileThumbnail({ file, size = 'md' }: FileThumbnailProps) {
     }
     let url: string | null = null
     let cancelled = false
-    fileApi.thumbnail(file.id)
-      .then(res => {
+    fileApi
+      .thumbnail(file.id)
+      .then((res) => {
         if (!cancelled) {
           url = URL.createObjectURL(res.data)
           setImgUrl(url)
@@ -70,15 +77,23 @@ export function FileThumbnail({ file, size = 'md' }: FileThumbnailProps) {
 
   if (isImage && imgUrl) {
     return (
-      <div className={`${containerSize} w-full overflow-hidden rounded-xl bg-surface-50`}>
-        <img src={imgUrl} alt={file.name} className="h-full w-full object-cover" />
+      <div
+        className={`${containerSize} w-full overflow-hidden rounded-xl bg-surface-50`}
+      >
+        <img
+          src={imgUrl}
+          alt={file.name}
+          className="h-full w-full object-cover"
+        />
       </div>
     )
   }
 
   // 非图片：展示图标 + 文件类型色块
   return (
-    <div className={`${containerSize} w-full flex items-center justify-center rounded-xl ${colorClass}`}>
+    <div
+      className={`${containerSize} w-full flex items-center justify-center rounded-xl ${colorClass}`}
+    >
       <Icon className={iconSize} />
     </div>
   )

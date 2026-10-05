@@ -49,7 +49,12 @@ export function SlideThumbnail({ slide }: SlideThumbnailProps) {
                 width: '100%',
                 height: '100%',
                 background: el.fill ? `#${el.fill}` : '#4A90D9',
-                borderRadius: el.shape === 'roundRect' ? '8px' : el.shape === 'ellipse' ? '50%' : '0',
+                borderRadius:
+                  el.shape === 'roundRect'
+                    ? '8px'
+                    : el.shape === 'ellipse'
+                      ? '50%'
+                      : '0',
               }}
             />
           )}

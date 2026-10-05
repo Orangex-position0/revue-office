@@ -68,7 +68,9 @@ function relativeLuminance(color?: string) {
     const s = value / 255
     return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4)
   }
-  return 0.2126 * channel(rgb.r) + 0.7152 * channel(rgb.g) + 0.0722 * channel(rgb.b)
+  return (
+    0.2126 * channel(rgb.r) + 0.7152 * channel(rgb.g) + 0.0722 * channel(rgb.b)
+  )
 }
 
 function contrastRatio(foreground?: string, background?: string) {
@@ -124,11 +126,18 @@ function AutoFitText({
     if (!node) return
 
     let next = initialFontSize
-    const min = Math.max(7, Math.min(12, Math.round((el.fontSize || initialFontSize) * 0.55)))
+    const min = Math.max(
+      7,
+      Math.min(12, Math.round((el.fontSize || initialFontSize) * 0.55)),
+    )
     node.style.fontSize = `${next}px`
 
     // DOM 实测兜底：后端已经重排，这里处理浏览器字体差异/缩放差异导致的残余裁切。
-    while ((node.scrollHeight > node.clientHeight + 1 || node.scrollWidth > node.clientWidth + 1) && next > min) {
+    while (
+      (node.scrollHeight > node.clientHeight + 1 ||
+        node.scrollWidth > node.clientWidth + 1) &&
+      next > min
+    ) {
       next -= 1
       node.style.fontSize = `${next}px`
     }
@@ -186,8 +195,17 @@ function ElementRenderer({
     display: 'flex',
     flexDirection: 'column',
     justifyContent:
-      el.valign === 'middle' ? 'center' : el.valign === 'bottom' ? 'flex-end' : 'flex-start',
-    alignItems: el.align === 'center' ? 'center' : el.align === 'right' ? 'flex-end' : 'flex-start',
+      el.valign === 'middle'
+        ? 'center'
+        : el.valign === 'bottom'
+          ? 'flex-end'
+          : 'flex-start',
+    alignItems:
+      el.align === 'center'
+        ? 'center'
+        : el.align === 'right'
+          ? 'flex-end'
+          : 'flex-start',
     background: el.fill ? normalizeColor(el.fill) : 'transparent',
   }
 
@@ -201,7 +219,11 @@ function ElementRenderer({
           overflow: 'hidden',
         }}
       >
-        <AutoFitText element={el} initialFontSize={fs} background={slideBackground} />
+        <AutoFitText
+          element={el}
+          initialFontSize={fs}
+          background={slideBackground}
+        />
       </div>
     )
   }
@@ -209,7 +231,11 @@ function ElementRenderer({
   if (el.type === 'image' && el.path) {
     return (
       <div style={baseStyle}>
-        <img src={el.path} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+        <img
+          src={el.path}
+          alt=""
+          style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+        />
       </div>
     )
   }
@@ -221,11 +247,15 @@ function ElementRenderer({
           ...baseStyle,
           background: el.fill ? normalizeColor(el.fill, '4A90D9') : '#4A90D9',
           borderRadius:
-            el.shape === 'roundRect' ? Math.min(28, Math.max(10, toPxH(el.h) * 0.08)) :
-            el.shape === 'ellipse' ? '50%' : '0',
-          boxShadow: el.shape === 'roundRect' && el.w > 2 && el.h > 1
-            ? '0 18px 42px rgba(15, 23, 42, 0.08)'
-            : undefined,
+            el.shape === 'roundRect'
+              ? Math.min(28, Math.max(10, toPxH(el.h) * 0.08))
+              : el.shape === 'ellipse'
+                ? '50%'
+                : '0',
+          boxShadow:
+            el.shape === 'roundRect' && el.w > 2 && el.h > 1
+              ? '0 18px 42px rgba(15, 23, 42, 0.08)'
+              : undefined,
         }}
       />
     )
@@ -244,7 +274,10 @@ function ElementRenderer({
                     className="border border-surface-200 px-2 py-1"
                     style={{
                       fontSize: fontSizeForBox(el) * 0.85,
-                      color: readableTextColor(el.color, ri === 0 ? 'F4F4F5' : 'FFFFFF'),
+                      color: readableTextColor(
+                        el.color,
+                        ri === 0 ? 'F4F4F5' : 'FFFFFF',
+                      ),
                       textAlign: (el.align || 'left') as any,
                       fontWeight: ri === 0 ? 'bold' : 'normal',
                       background: ri === 0 ? '#f4f4f5' : 'white',
@@ -263,7 +296,10 @@ function ElementRenderer({
 
   if (el.type === 'chart') {
     return (
-      <div style={baseStyle} className="overflow-hidden rounded-xl bg-white p-2 shadow-sm ring-1 ring-black/[0.06]">
+      <div
+        style={baseStyle}
+        className="overflow-hidden rounded-xl bg-white p-2 shadow-sm ring-1 ring-black/[0.06]"
+      >
         <EChartsView
           title={el.text || el.chart_type || '图表'}
           chartType={el.chart_type}
